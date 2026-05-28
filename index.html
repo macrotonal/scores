@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macro &mdash; Scores</title>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060907;--text:#d4e8d8;
+  --dim:rgba(212,232,216,0.48);--faint:rgba(212,232,216,0.22);
+  --border:rgba(74,158,104,0.15);--card:rgba(10,16,12,0.96);
+  --green:#4a9e68;--gl:#7dc49a;
+  --red:#ff6b55;--yellow:#ffd84a;--gnote:#4ed87a;--blue:#5ab4ff;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Futura','Century Gothic','Trebuchet MS',sans-serif;
+  min-height:100vh;padding:40px 16px 64px;
+}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 25% 65%,rgba(15,50,25,0.16) 0%,transparent 55%),
+             radial-gradient(ellipse at 75% 20%,rgba(10,35,18,0.1) 0%,transparent 55%)}
+.frame{position:fixed;inset:10px;border:1px solid rgba(74,158,104,0.09);pointer-events:none}
+.wrap{position:relative;max-width:800px;margin:0 auto}
+
+/* Header */
+.site-header{text-align:center;margin-bottom:40px}
+.eyebrow{font-size:9px;letter-spacing:7px;text-transform:uppercase;color:rgba(74,158,104,0.45);display:block;margin-bottom:10px}
+.site-title{font-size:clamp(24px,4vw,38px);font-weight:300;;color:#e8f5ec;letter-spacing:1px;margin-bottom:4px}
+.site-sub{font-size:13px;color:var(--faint);letter-spacing:2px}
+.rule{width:40px;height:1px;background:linear-gradient(90deg,transparent,rgba(74,158,104,0.4),transparent);margin:16px auto}
+
+/* Colour key */
+.colour-key{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:26px}
+.ck{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);
+  border-radius:2px;padding:5px 12px;font-size:11px;color:var(--dim)}
+.ck-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Piece nav */
+.piece-nav{display:flex;gap:6px;justify-content:center;margin-bottom:32px;flex-wrap:wrap}
+.pn-btn{background:transparent;border:1px solid rgba(74,158,104,0.18);color:var(--faint);
+  padding:6px 18px;border-radius:2px;font-family:'Futura','Century Gothic','Trebuchet MS',sans-serif;font-size:11px;
+  letter-spacing:2px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-block}
+.pn-btn:hover{border-color:rgba(74,158,104,0.4);color:var(--text)}
+
+/* Piece section */
+.piece{margin-bottom:48px;scroll-margin-top:24px}
+.piece-head{margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.piece-head-left{flex:1}
+.piece-label{font-size:9px;letter-spacing:6px;text-transform:uppercase;color:rgba(74,158,104,0.4);display:block;margin-bottom:6px}
+.piece-title{font-size:clamp(24px,4vw,38px);font-weight:300;;color:#e8f5ec;letter-spacing:0.5px;margin-bottom:4px}
+.piece-meta{font-size:12px;color:var(--faint);letter-spacing:1px}
+
+/* Piece-level audio player */
+.piece-audio{display:flex;align-items:center;gap:10px;background:var(--card);
+  border:1px solid var(--border);border-radius:4px;padding:12px 16px;margin-bottom:12px}
+.piece-audio.tbc{opacity:0.45;pointer-events:none}
+.pa-title{font-size:12px;color:var(--dim);flex:1;}
+.pa-btns{display:flex;gap:6px;flex-shrink:0}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:10px}
+.card-head{padding:13px 18px;border-bottom:1px solid rgba(74,158,104,0.08);display:flex;
+  align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.card-head.nocursor{cursor:default}
+.card-head-title{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--faint)}
+.card-tog{font-size:11px;color:rgba(74,158,104,0.4);letter-spacing:1px;transition:color 0.2s}
+.card:hover .card-tog{color:rgba(74,158,104,0.65)}
+.card-body{display:none}
+.card-body.open{display:block}
+
+/* Programme note body */
+.desc-body{padding:18px 20px}
+.desc-text{font-size:15px;color:var(--dim);line-height:1.85;margin-bottom:14px}
+.desc-text:last-child{margin-bottom:0}
+
+/* Section within parts card */
+.part-section{border-bottom:1px solid rgba(74,158,104,0.07)}
+.part-section:last-child{border-bottom:none}
+.part-section-head{padding:11px 18px 10px;background:rgba(74,158,104,0.03)}
+.part-section-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(74,158,104,0.4);display:block;margin-bottom:4px}
+.part-section-desc{font-size:11px;color:var(--faint);line-height:1.55}
+
+/* Section-level audio row */
+.section-audio-row{display:flex;align-items:center;gap:10px;padding:9px 18px;
+  border-bottom:1px solid rgba(74,158,104,0.05);background:rgba(74,158,104,0.02)}
+.sar-label{font-size:12px;color:var(--dim);flex:1;}
+
+/* Individual part rows */
+.part-row{display:flex;align-items:center;gap:10px;padding:9px 18px;
+  border-bottom:1px solid rgba(74,158,104,0.04);transition:background 0.15s}
+.part-row:last-child{border-bottom:none}
+.part-row:hover{background:rgba(74,158,104,0.03)}
+.part-name{font-size:13px;color:var(--text);flex:1}
+.part-btns{display:flex;gap:5px;flex-shrink:0}
+
+/* TBC placeholder */
+.tbc-row{padding:10px 18px;font-size:12px;color:var(--faint);;
+  border-bottom:1px solid rgba(74,158,104,0.04)}
+.tbc-row:last-child{border-bottom:none}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;background:transparent;
+  border:1px solid rgba(74,158,104,0.2);color:var(--dim);padding:5px 11px;border-radius:2px;
+  font-family:'Futura','Century Gothic','Trebuchet MS',sans-serif;font-size:12px;letter-spacing:0.5px;
+  cursor:pointer;text-decoration:none;transition:all 0.18s;white-space:nowrap;flex-shrink:0}
+.btn:hover{border-color:rgba(74,158,104,0.5);color:var(--text);background:rgba(74,158,104,0.06)}
+.btn.play{border-color:rgba(74,158,104,0.25);color:var(--gl)}
+.btn.play:hover{border-color:rgba(74,158,104,0.6);color:#fff;background:rgba(74,158,104,0.08)}
+.btn.play.active{background:rgba(74,158,104,0.14);border-color:rgba(74,158,104,0.7);color:#fff}
+.btn.dl{border-color:rgba(74,158,104,0.15);color:var(--faint)}
+.btn.dl:hover{border-color:rgba(74,158,104,0.4);color:var(--text)}
+.btn.tbc-btn{opacity:0.35;pointer-events:none;cursor:default}
+.btn svg{width:11px;height:11px;flex-shrink:0}
+
+/* Global audio bar */
+.audio-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(6,9,7,0.97);border-top:1px solid rgba(74,158,104,0.2);
+  padding:10px 20px;display:none;z-index:100;
+  align-items:center;gap:14px;flex-wrap:wrap;
+}
+.audio-bar.visible{display:flex}
+.ab-title{font-size:12px;color:var(--gl);flex:1;min-width:120px;}
+.ab-controls{display:flex;align-items:center;gap:10px}
+.ab-play{width:32px;height:32px;border-radius:50%;background:transparent;
+  border:1px solid rgba(74,158,104,0.4);color:var(--gl);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.ab-play:hover{background:rgba(74,158,104,0.1);border-color:rgba(74,158,104,0.7)}
+.ab-progress{flex:1;min-width:100px;height:3px;background:rgba(74,158,104,0.15);
+  border-radius:2px;cursor:pointer;position:relative}
+.ab-fill{height:100%;background:var(--gl);border-radius:2px;width:0%;transition:width 0.1s linear}
+.ab-time{font-size:11px;color:var(--faint);white-space:nowrap;font-family:monospace}
+.ab-close{background:transparent;border:none;color:var(--faint);cursor:pointer;
+  font-size:16px;padding:4px;line-height:1;transition:color 0.2s}
+.ab-close:hover{color:var(--text)}
+
+/* Recording notes */
+.rec-body{padding:16px 18px}
+.rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rec-item{background:rgba(74,158,104,0.04);border:1px solid rgba(74,158,104,0.1);
+  border-radius:3px;padding:12px 14px}
+.rec-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(74,158,104,0.45);margin-bottom:5px;display:block}
+.rec-text{font-size:12px;color:var(--dim);line-height:1.6}
+.rec-full{grid-column:1/-1}
+
+/* Resources */
+.res-body{padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap}
+.res-btn{display:inline-flex;align-items:center;background:transparent;
+  border:1px solid rgba(74,158,104,0.15);color:var(--faint);padding:7px 14px;border-radius:2px;
+  font-family:'Futura','Century Gothic','Trebuchet MS',sans-serif;font-size:13px;letter-spacing:1px;
+  text-decoration:none;transition:all 0.2s}
+.res-btn:hover{border-color:rgba(74,158,104,0.4);color:var(--text)}
+
+.piece-rule{width:100%;height:1px;background:rgba(74,158,104,0.08);margin:44px 0}
+.footer{text-align:center;font-size:9px;color:var(--faint);letter-spacing:2px;text-transform:uppercase;margin-top:12px;padding-bottom:60px}
+
+@media(max-width:520px){.rec-grid{grid-template-columns:1fr}.rec-full{grid-column:1}}
+</style>
+</head>
+<body>
+<div class="frame"></div>
+
+<!-- Global audio bar -->
+<div class="audio-bar" id="audioBar">
+  <div class="ab-title" id="abTitle">—</div>
+  <div class="ab-controls">
+    <button class="ab-play" id="abPlay" onclick="abToggle()">
+      <svg id="abIcon" viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M5 3l10 5-10 5V3z"/></svg>
+    </button>
+    <div class="ab-progress" id="abProgress" onclick="abSeek(event)">
+      <div class="ab-fill" id="abFill"></div>
+    </div>
+    <span class="ab-time" id="abTime">0:00</span>
+    <a id="abDl" href="#" download class="btn dl" style="margin-left:4px">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL
+    </a>
+    <button class="ab-close" onclick="abClose()">&#x2715;</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="site-header">
+  <span class="eyebrow">Sam Annand / Macrotonal Ensemble</span>
+  <div class="site-title">Macro &mdash; Scores</div>
+  <div class="site-sub">Three compositions &middot; Creative Scotland</div>
+  <div class="rule"></div>
+</div>
+
+<div class="colour-key">
+  <div class="ck"><div class="ck-dot" style="background:var(--red)"></div>Red &mdash; no adjustment</div>
+  <div class="ck"><div class="ck-dot" style="background:var(--yellow)"></div>Yellow +25&cent;</div>
+  <div class="ck"><div class="ck-dot" style="background:var(--gnote)"></div>Green &minus;50&cent;</div>
+  <div class="ck"><div class="ck-dot" style="background:var(--blue)"></div>Blue &minus;25&cent;</div>
+</div>
+
+<div class="piece-nav">
+  <a class="pn-btn" href="#golden-hour">Golden Hour</a>
+  <a class="pn-btn" href="#rgb">RGB</a>
+  <a class="pn-btn" href="#moonlit">Moonlit Eucalyptus</a>
+</div>
+
+<!-- ══════════════════════
+     GOLDEN HOUR
+     ══════════════════════ -->
+<div class="piece" id="golden-hour">
+
+  <div class="piece-head">
+    <div class="piece-head-left">
+      <span class="piece-label">I</span>
+      <div class="piece-title">Golden Hour</div>
+      <div class="piece-meta">95 bpm &middot; 4/4 &middot; Alto Saxophone Quartet &middot; Clarinets &middot; Strings &middot; Harp</div>
+    </div>
+  </div>
+
+  <!-- Full composition audio -->
+  <div class="piece-audio tbc" id="pa-gh">
+    <div class="pa-title">Full composition demo</div>
+    <div class="pa-btns">
+      <button class="btn play tbc-btn" onclick="playAudio('audio/golden_hour_demo.mp3','Golden Hour — Full demo','pa-gh-play')">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play
+      </button>
+      <a class="btn dl tbc-btn" href="audio/golden_hour_demo.mp3" download>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download
+      </a>
+    </div>
+  </div>
+
+  <!-- Programme note -->
+  <div class="card">
+    <div class="card-head" onclick="tog(this)">
+      <span class="card-head-title">Programme note</span>
+      <span class="card-tog">Read &darr;</span>
+    </div>
+    <div class="card-body">
+      <div class="desc-body">
+        <p class="desc-text">Golden Hour begins from a place of familiarity: an A minor seventh chord derived from the foundational structure of the tuning system itself, where each harmonic &ldquo;colour&rdquo; is built from stacked fourths. From this almost just intonational opening, the piece gradually introduces more unfamiliar intervallic relationships as the clarinets emerge, allowing rhythmic beating and subtle microtonal interference patterns to slowly bloom inside the harmony. The music is intended to unfold organically, like a flower opening or a fern uncurling, moving from something stable and recognisable into increasingly intricate textures and shapes.</p>
+        <p class="desc-text">The sonic world of the piece is closely tied to the atmosphere of early to late spring: the glowing green of overcast days, newly formed leaves, and the imagined interior colour of tulips. A central gesture is the saxophone hocket, where sustained tones are passed continuously between performers in a circular motion, allowing the physical limitations of breath itself to shape the rhythm and phrasing. Rather than concealing the mechanics of performance, the work embraces them, creating a cooperative pulse that hovers around a slow, breathing momentum.</p>
+        <p class="desc-text">The string writing draws inspiration from <em>Within You Without You</em> by The Beatles, particularly its layered doubling and raga-influenced modal character. In Golden Hour, these influences become refracted through the macrotonal tuning system before gradually giving way to a more rhythmic, folk-like closing section featuring harp, saxophone arpeggios, and future vocal overdubs intended to imitate blackbirds moving through trees and bushes at dusk.</p>
+        <p class="desc-text">Beneath this final section is a slight melancholic lilt within the tuning itself, reflecting the impermanence at the end of spring: daffodils losing their heads, blossom falling from the trees, and bluebells beginning to wither as that brief luminous season slowly disappears for another year.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parts -->
+  <div class="card">
+    <div class="card-head" onclick="tog(this)">
+      <span class="card-head-title">Scores + Audio Examples</span>
+      <span class="card-tog">Open &darr;</span>
+    </div>
+    <div class="card-body">
+
+      <!-- Sax Hocket -->
+      <div class="part-section">
+        <div class="part-section-head">
+          <span class="part-section-label">Alto Saxophone Quartet &mdash; Hocket</span>
+          <div class="part-section-desc">Sustained tones passed between four saxophonists in a circle. Each player breathes independently so the chord never stops sounding. The circular motion of breath shapes the rhythm and harmonic pulse of the entire piece.</div>
+        </div>
+        <!-- Section audio: all 4 saxes together -->
+        <div class="section-audio-row">
+          <span class="sar-label">All four saxophones together</span>
+          <div class="part-btns">
+            <button class="btn play tbc-btn" onclick="playAudio('audio/gh_sax_hocket_all.mp3','Golden Hour — Saxophone Hocket (all)','')">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play
+            </button>
+            <a class="btn dl tbc-btn" href="audio/gh_sax_hocket_all.mp3" download>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL
+            </a>
+            <a class="btn dl" href="Golden_Hour_Saxophone_Hocket.pdf" download>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score
+            </a>
+            <a class="btn play" href="https://macrotonal.github.io/scores/hocket.html" target="_blank">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/></svg>Interactive
+            </a>
+          </div>
+        </div>
+        <div class="part-row">
+          <span class="part-name">Alto Saxophone Hocket 1</span>
+          <div class="part-btns">
+            <button class="btn play tbc-btn" onclick="playAudio('audio/gh_sax_1.mp3','Golden Hour — Sax Hocket 1','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+            <a class="btn dl tbc-btn" href="audio/gh_sax_1.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a>
+            <a class="btn dl" href="Golden_Hour_Saxophone_Hocket.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a>
+          </div>
+        </div>
+        <div class="part-row">
+          <span class="part-name">Alto Saxophone Hocket 2</span>
+          <div class="part-btns">
+            <button class="btn play tbc-btn" onclick="playAudio('audio/gh_sax_2.mp3','Golden Hour — Sax Hocket 2','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+            <a class="btn dl tbc-btn" href="audio/gh_sax_2.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a>
+            <a class="btn dl" href="Golden_Hour_Saxophone_Hocket.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a>
+          </div>
+        </div>
+        <div class="part-row">
+          <span class="part-name">Alto Saxophone Hocket 3</span>
+          <div class="part-btns">
+            <button class="btn play tbc-btn" onclick="playAudio('audio/gh_sax_3.mp3','Golden Hour — Sax Hocket 3','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+            <a class="btn dl tbc-btn" href="audio/gh_sax_3.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a>
+            <a class="btn dl" href="Golden_Hour_Saxophone_Hocket.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a>
+          </div>
+        </div>
+        <div class="part-row">
+          <span class="part-name">Alto Saxophone Hocket 4</span>
+          <div class="part-btns">
+            <button class="btn play tbc-btn" onclick="playAudio('audio/gh_sax_4.mp3','Golden Hour — Sax Hocket 4','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+            <a class="btn dl tbc-btn" href="audio/gh_sax_4.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a>
+            <a class="btn dl" href="Golden_Hour_Saxophone_Hocket.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strings -->
+      <div class="part-section">
+        <div class="part-section-head">
+          <span class="part-section-label">Strings</span>
+        </div>
+        <div class="section-audio-row">
+          <span class="sar-label">Full string ensemble</span>
+          <div class="part-btns">
+            <button class="btn play tbc-btn" onclick="playAudio('audio/gh_strings_all.mp3','Golden Hour — Strings (full)','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+            <a class="btn dl tbc-btn" href="audio/gh_strings_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a>
+            <a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a>
+          </div>
+        </div>
+        <!-- Individual strings -->
+        <div class="part-row"><span class="part-name">Violin 1</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vln1.mp3','Golden Hour — Violin 1','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vln1.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Violin 2</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vln2.mp3','Golden Hour — Violin 2','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vln2.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Violin 3</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vln3.mp3','Golden Hour — Violin 3','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vln3.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Violin 4</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vln4.mp3','Golden Hour — Violin 4','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vln4.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Violin 5</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vln5.mp3','Golden Hour — Violin 5','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vln5.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Viola 1</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vla1.mp3','Golden Hour — Viola 1','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vla1.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Viola 2</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_vla2.mp3','Golden Hour — Viola 2','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_vla2.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Cello 1</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_cel1.mp3','Golden Hour — Cello 1','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_cel1.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Cello 2</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_cel2.mp3','Golden Hour — Cello 2','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_cel2.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Cello 3</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_cel3.mp3','Golden Hour — Cello 3','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_cel3.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Cello 4</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_cel4.mp3','Golden Hour — Cello 4','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_cel4.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Low Cello 1</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_locel1.mp3','Golden Hour — Low Cello 1','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_locel1.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+        <div class="part-row"><span class="part-name">Low Cello 2</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_locel2.mp3','Golden Hour — Low Cello 2','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_locel2.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><a class="btn dl" href="Golden_Hour_Strings.pdf" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Score</a></div></div>
+      </div>
+
+      <!-- Clarinets -->
+      <div class="part-section">
+        <div class="part-section-head"><span class="part-section-label">Clarinets</span></div>
+        <div class="section-audio-row"><span class="sar-label">All clarinets together</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_clarinets_all.mp3','Golden Hour — Clarinets (all)','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_clarinets_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div>
+        <div class="tbc-row">Individual clarinet parts &mdash; scores and audio to be added.</div>
+      </div>
+
+      <!-- Sax Arpeggios -->
+      <div class="part-section">
+        <div class="part-section-head"><span class="part-section-label">Saxophone Arpeggios</span></div>
+        <div class="tbc-row">Score and audio to be added.</div>
+      </div>
+
+      <!-- Harp -->
+      <div class="part-section">
+        <div class="part-section-head"><span class="part-section-label">Harp</span></div>
+        <div class="section-audio-row"><span class="sar-label">Both harps together</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_harps_all.mp3','Golden Hour — Harps (all)','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_harps_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div>
+        <div class="part-row"><span class="part-name">Harp 1</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_harp1.mp3','Golden Hour — Harp 1','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_harp1.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div>
+        <div class="part-row"><span class="part-name">Harp 2</span><div class="part-btns"><button class="btn play tbc-btn" onclick="playAudio('audio/gh_harp2.mp3','Golden Hour — Harp 2','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/gh_harp2.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Recording notes -->
+  <div class="card">
+    <div class="card-head" onclick="tog(this)">
+      <span class="card-head-title">Recording notes</span>
+      <span class="card-tog">Read &darr;</span>
+    </div>
+    <div class="card-body">
+      <div class="rec-body">
+        <div class="rec-grid">
+          <div class="rec-item rec-full"><span class="rec-label">Setup</span><div class="rec-text">Musicians seated in a circle. Neumann binaural head at the centre as the main ambient mic, capturing the circular hocket motion in the stereo image. Close mics are Schoeps condensers throughout. Room mics: Decca Tree preferred, or stereo X/Y.</div></div>
+          <div class="rec-item"><span class="rec-label">Saxophones (Hocket)</span><div class="rec-text">Schoeps condenser close mics. Players seated equidistant around the circle. Binaural head in the centre captures the spatial motion.</div></div>
+          <div class="rec-item"><span class="rec-label">Strings</span><div class="rec-text">Layered overdubbing and doubling. Individual ribbon mics per player. Schoeps condenser room mics. Decca Tree for ensemble room sound.</div></div>
+          <div class="rec-item"><span class="rec-label">Harp</span><div class="rec-text">Schoeps condenser close mics and room mics.</div></div>
+          <div class="rec-item"><span class="rec-label">Clarinets &amp; Sax Arpeggios</span><div class="rec-text">Schoeps condenser close mics and room mics.</div></div>
+          <div class="rec-item"><span class="rec-label">Future overdubs</span><div class="rec-text">Vocals planned for the closing section, imitating blackbirds moving through trees at dusk.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /golden-hour -->
+<div class="piece-rule"></div>
+
+<!-- ══════════════════════
+     RGB
+     ══════════════════════ -->
+<div class="piece" id="rgb">
+  <div class="piece-head">
+    <div class="piece-head-left">
+      <span class="piece-label">II</span>
+      <div class="piece-title">RGB</div>
+      <div class="piece-meta">90 bpm &middot; 3/4 &middot; Strings &middot; Clarinets &middot; Harp</div>
+    </div>
+  </div>
+
+  <div class="piece-audio tbc">
+    <div class="pa-title">Full composition demo</div>
+    <div class="pa-btns">
+      <button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+      <a class="btn dl tbc-btn" href="audio/rgb_demo.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" onclick="tog(this)"><span class="card-head-title">Programme note</span><span class="card-tog">Read &darr;</span></div>
+    <div class="card-body">
+      <div class="desc-body">
+        <p class="desc-text">RGB approaches the tuning system from the opposite direction to Golden Hour. Rather than beginning from a familiar harmonic centre, the piece constructs its opening sonorities from different regions of the tuning simultaneously, layering red, green, and blue note groupings against one another to create a shifting, luminous harmonic field. The work takes direct inspiration from light itself &mdash; both in the visual colour coding of the tuning system and in the way separate harmonic identities can combine into something unified, much like coloured light forming white light.</p>
+        <p class="desc-text">As a companion to the spring atmosphere of Golden Hour, RGB inhabits the height of summer. The harp writing is intended to evoke sunlight moving through leaves, reflections across water, and the soft instability of heat and air in motion. Throughout the piece there is a dreamlike, ornamental quality inspired by Art Nouveau imagery and the atmosphere of <em>A Midsummer Night&rsquo;s Dream</em>: overgrown gardens, glowing foliage, and moments where beauty feels almost suspended in time. When the violin melody emerges, it leans into the slight lilt within the tuning system itself, producing an emotional ambiguity that sits somewhere between joy and ache.</p>
+        <p class="desc-text">As the composition develops, the clarinets gradually pull the music into a more rhythmic and playful space, introducing a loose groove that contrasts with the floating textures of the opening. By the final section, the music becomes almost celebratory, with repeating figures and interlocking gestures that feel closer to a communal pulse than a fixed melody. The bass clarinet acts as a final release within the piece, arriving as a kind of payoff that grounds the surrounding shimmer into something warm, physical, and deeply satisfying.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" onclick="tog(this)"><span class="card-head-title">Scores + Audio Examples</span><span class="card-tog">Open &darr;</span></div>
+    <div class="card-body">
+      <div class="part-section"><div class="part-section-head"><span class="part-section-label">Strings</span></div><div class="section-audio-row"><span class="sar-label">Full string ensemble</span><div class="part-btns"><button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/rgb_strings_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div><div class="tbc-row">Individual string parts &mdash; scores and audio to be added.</div></div>
+      <div class="part-section"><div class="part-section-head"><span class="part-section-label">Clarinets</span></div><div class="section-audio-row"><span class="sar-label">All clarinets together</span><div class="part-btns"><button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/rgb_clarinets_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div><div class="tbc-row">Individual clarinet parts &mdash; scores and audio to be added.</div></div>
+      <div class="part-section"><div class="part-section-head"><span class="part-section-label">Harp</span></div><div class="section-audio-row"><span class="sar-label">Both harps together</span><div class="part-btns"><button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/rgb_harps_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div><div class="tbc-row">Individual harp parts &mdash; scores and audio to be added.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" onclick="tog(this)"><span class="card-head-title">Recording notes</span><span class="card-tog">Read &darr;</span></div>
+    <div class="card-body">
+      <div class="rec-body"><div class="rec-grid">
+        <div class="rec-item rec-full"><span class="rec-label">Setup</span><div class="rec-text">Room mics: Decca Tree preferred, or stereo X/Y. Schoeps condensers close throughout.</div></div>
+        <div class="rec-item"><span class="rec-label">Strings</span><div class="rec-text">Individual ribbon mics per player. Schoeps condenser room mics. Layered overdubbing approach.</div></div>
+        <div class="rec-item"><span class="rec-label">Clarinets</span><div class="rec-text">Schoeps condenser close and room mics. Attention to bass clarinet in the final section.</div></div>
+        <div class="rec-item"><span class="rec-label">Harp</span><div class="rec-text">Schoeps condenser close and room mics.</div></div>
+      </div></div>
+    </div>
+  </div>
+
+</div><!-- /rgb -->
+<div class="piece-rule"></div>
+
+<!-- ══════════════════════
+     MOONLIT EUCALYPTUS
+     ══════════════════════ -->
+<div class="piece" id="moonlit">
+  <div class="piece-head">
+    <div class="piece-head-left">
+      <span class="piece-label">III</span>
+      <div class="piece-title">Moonlit Eucalyptus</div>
+      <div class="piece-meta">96 bpm &middot; 4/4 &middot; Strings &middot; Saxophone &middot; Buchla 700</div>
+    </div>
+  </div>
+
+  <div class="piece-audio tbc">
+    <div class="pa-title">Full composition demo</div>
+    <div class="pa-btns">
+      <button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button>
+      <a class="btn dl tbc-btn" href="audio/moonlit_demo.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" onclick="tog(this)"><span class="card-head-title">Programme note</span><span class="card-tog">Read &darr;</span></div>
+    <div class="card-body">
+      <div class="desc-body">
+        <p class="desc-text">Moonlit Eucalyptus was the first composition written using the tuning system, created before its structures and relationships had been fully systematised. It emerged from the earliest intuitive experiments with implementing the tuning inside digital instruments and samplers, allowing strings, saxophones, and sustained acoustic textures to inhabit the harmonic world for the first time. Because of this, the piece carries a sense of discovery throughout: an attempt to feel out the emotional and tonal character of the system intuitively, before any formal framework had been established around it.</p>
+        <p class="desc-text">The composition opens with slowly shifting cello figures that seem to emerge gradually out of silence, before violins introduce a more unsettled and ambiguous harmonic language. Much of the first half explores what felt intuitively like the tuning system&rsquo;s &ldquo;minor&rdquo; quality: dark, eerie, and slightly alien, with emotional relationships that do not map cleanly onto conventional Western harmony. The piece was strongly shaped by the atmosphere of moonlight itself, particularly the strange duality of the moon as something both beautiful and unknowable.</p>
+        <p class="desc-text">As the work progresses, the harmony gradually resolves into what felt like the tuning system&rsquo;s &ldquo;major&rdquo; counterpart, though this shift is less triumphant than dreamlike. The brighter sonorities retain a softness and ambiguity, as if the music never fully settles into certainty. Written beneath a full autumn moon and inspired by the sight of moonlight illuminating a eucalyptus tree in the garden outside my old cottage, the piece became an attempt to capture both the visual atmosphere of that moment and the emotional attachment tied to the tree itself. After eight years living underneath it, the eucalyptus later became a symbol of loss when it was cut down shortly before I was forced to leave the cottage. In this sense, Moonlit Eucalyptus also functions as a quiet dedication to that tree: its shifting bark textures, luminous greens and turquoise tones, and the memory of a place transformed by moonlight.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" onclick="tog(this)"><span class="card-head-title">Scores + Audio Examples</span><span class="card-tog">Open &darr;</span></div>
+    <div class="card-body">
+      <div class="part-section"><div class="part-section-head"><span class="part-section-label">Strings</span></div><div class="section-audio-row"><span class="sar-label">Full string ensemble</span><div class="part-btns"><button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/me_strings_all.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div><div class="tbc-row">Individual string parts &mdash; scores and audio to be added.</div></div>
+      <div class="part-section"><div class="part-section-head"><span class="part-section-label">Saxophone</span></div><div class="section-audio-row"><span class="sar-label">Saxophone part</span><div class="part-btns"><button class="btn play tbc-btn"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l10 5-10 5V3z"/></svg>Play</button><a class="btn dl tbc-btn" href="audio/me_sax.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>DL</a><span class="btn tbc-btn">Score TBC</span></div></div></div>
+      <div class="part-section"><div class="part-section-head"><span class="part-section-label">Buchla 700</span><div class="part-section-desc" style="margin-top:3px">Patch notes and Scala tuning files to be added.</div></div><div class="tbc-row">Patch documentation and audio to be added.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" onclick="tog(this)"><span class="card-head-title">Recording notes</span><span class="card-tog">Read &darr;</span></div>
+    <div class="card-body">
+      <div class="rec-body"><div class="rec-grid">
+        <div class="rec-item rec-full"><span class="rec-label">Setup</span><div class="rec-text">Room mics: Decca Tree preferred, or stereo X/Y. Schoeps condensers close throughout.</div></div>
+        <div class="rec-item"><span class="rec-label">Strings</span><div class="rec-text">Individual ribbon mics per player. Schoeps condenser room mics. Layered overdubbing.</div></div>
+        <div class="rec-item"><span class="rec-label">Saxophone</span><div class="rec-text">Schoeps condenser close and room mics.</div></div>
+        <div class="rec-item"><span class="rec-label">Buchla 700</span><div class="rec-text">Direct output. Tuning implemented via Scala files &mdash; see Theory Reference for cent values and degree names.</div></div>
+      </div></div>
+    </div>
+  </div>
+
+</div><!-- /moonlit -->
+
+<div class="piece-rule" style="margin-top:16px"></div>
+
+<!-- Resources -->
+<div class="card" style="margin-bottom:28px">
+  <div class="card-head nocursor"><span class="card-head-title">Performer resources</span></div>
+  <div class="res-body">
+    <a class="res-btn" href="https://macrotonal.github.io/dynamicmacrotuner/" target="_blank">Macro Tuner</a>
+    <a class="res-btn" href="https://macrotonal.github.io/macroeartrainer/" target="_blank">Ear Trainer</a>
+    <a class="res-btn" href="https://macrotonal.github.io/explore/" target="_blank">Chord &amp; Scale Explorer</a>
+    <a class="res-btn" href="https://macrotonal.github.io/harp/" target="_blank">Harp Spelling</a>
+    <a class="res-btn" href="https://macrotonal.github.io/macrokey/" target="_blank">Theory Reference</a>
+  </div>
+</div>
+
+<div class="footer">Macro &middot; Sam Annand &middot; Creative Scotland &middot; 125&cent; per degree</div>
+
+</div><!-- /wrap -->
+
+<!-- Hidden audio element -->
+<audio id="globalAudio" preload="none"></audio>
+
+<script>
+// ── Card toggling ────────────────────────────────────────────
+function tog(head) {
+  const body = head.nextElementSibling
+  const t    = head.querySelector('.card-tog')
+  const open = body.classList.toggle('open')
+  const title = head.querySelector('.card-head-title').textContent
+  if (title.includes('Programme')) t.innerHTML = open ? 'Close &uarr;' : 'Read &darr;'
+  else t.innerHTML = open ? 'Close &uarr;' : 'Open &darr;'
+}
+
+// ── Default open state ───────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.card-head[onclick]').forEach(head => {
+    const title = head.querySelector('.card-head-title').textContent
+    if (title.includes('Programme')) {
+      head.nextElementSibling.classList.add('open')
+      head.querySelector('.card-tog').innerHTML = 'Close &uarr;'
+    }
+  })
+})
+
+// ── Audio player ─────────────────────────────────────────────
+const audio    = document.getElementById('globalAudio')
+const bar      = document.getElementById('audioBar')
+const abTitle  = document.getElementById('abTitle')
+const abPlay   = document.getElementById('abPlay')
+const abIcon   = document.getElementById('abIcon')
+const abFill   = document.getElementById('abFill')
+const abTime   = document.getElementById('abTime')
+const abDl     = document.getElementById('abDl')
+
+let currentSrc = null
+let currentBtn = null
+
+const PLAY_ICON = '<path d="M5 3l10 5-10 5V3z"/>'
+const PAUSE_ICON = '<path d="M4 3h3v10H4zM9 3h3v10H9z"/>'
+
+function fmt(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60)
+  return m+':'+(sec<10?'0':'')+sec
+}
+
+function playAudio(src, title, btnId) {
+  if (currentSrc === src && !audio.paused) { audio.pause(); return }
+  if (currentSrc === src && audio.paused)  { audio.play(); return }
+
+  // New track
+  if (currentBtn) currentBtn.classList.remove('active')
+  audio.src = src
+  audio.play()
+  currentSrc = src
+  abTitle.textContent = title
+  abDl.href = src
+  abDl.download = src.split('/').pop()
+  bar.classList.add('visible')
+}
+
+audio.addEventListener('play', () => {
+  abIcon.innerHTML = PAUSE_ICON
+  // Mark active play btn
+  document.querySelectorAll('.btn.play').forEach(b => b.classList.remove('active'))
+})
+audio.addEventListener('pause', () => {
+  abIcon.innerHTML = PLAY_ICON
+})
+audio.addEventListener('ended', () => {
+  abIcon.innerHTML = PLAY_ICON
+  abFill.style.width = '0%'
+  abTime.textContent = '0:00'
+})
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return
+  const pct = (audio.currentTime / audio.duration) * 100
+  abFill.style.width = pct + '%'
+  abTime.textContent = fmt(audio.currentTime) + ' / ' + fmt(audio.duration)
+})
+
+function abToggle() {
+  if (audio.paused) audio.play(); else audio.pause()
+}
+
+function abSeek(e) {
+  if (!audio.duration) return
+  const bar = document.getElementById('abProgress')
+  const rect = bar.getBoundingClientRect()
+  const pct  = (e.clientX - rect.left) / rect.width
+  audio.currentTime = pct * audio.duration
+}
+
+function abClose() {
+  audio.pause()
+  audio.src = ''
+  currentSrc = null
+  bar.classList.remove('visible')
+  abFill.style.width = '0%'
+  abTime.textContent = '0:00'
+}
+</script>
+</body>
+</html>
