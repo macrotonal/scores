@@ -157,6 +157,8 @@ input[type=range]::-webkit-slider-thumb{
       <button class="ctrl-btn voice-sax" data-i="1">S2</button>
       <button class="ctrl-btn voice-sax" data-i="2">S3</button>
       <button class="ctrl-btn voice-sax" data-i="3">S4</button>
+      <select id="voice-select" style="font-family:'Space Mono',monospace;font-size:9px;padding:4px 6px;border:2px solid #111;border-radius:4px;background:#fff;cursor:pointer;"></select>
+      <input type="range" id="voice-vol" min="0.1" max="1" step="0.05" value="1" title="Voice volume">
     </div>
     <button class="ctrl-btn" id="sync-sound" style="display:none">&#9836; Sound</button>
     <div class="ctrl-group" id="nudge-group" style="display:none">
@@ -848,9 +850,12 @@ input[type=range]::-webkit-slider-thumb{
   // on the last four beats, landing the change on the next beat. Uses the
   // built-in speech synthesiser; the click remains the precision reference,
   // the voice is the instruction.
-  const VOICE={part:parseInt(localStorage.getItem('hocketVoicePart')||'-1',10),cues:[],idx:0};
+  const VOICE={part:parseInt(localStorage.getItem('hocketVoicePart')||'-1',10),cues:[],idx:0,
+              voiceList:[],chosen:null,
+              vol:Math.min(1,Math.max(0.1,parseFloat(localStorage.getItem('hocketVoiceVol')||'1')))};
   if(!(VOICE.part>=0&&VOICE.part<=3))VOICE.part=-1;
-  localStorage.removeItem('hocketVoice'); // clear old pre-toggle storage key, if present
+  localStorage.removeItem('hocketVoice');    // pre-toggle key
+  localStorage.removeItem('hocketVoiceIdx'); // pre-name-based key
   const voiceBtns=[...document.querySelectorAll('.voice-sax')];
   const COLOUR_WORD={[COL.red]:'red',[COL.yellow]:'yellow',[COL.green]:'green',[COL.blue]:'blue'};
   const ACC_WORD={'C#':'C sharp','Eb':'E flat','F#':'F sharp','Ab':'A flat','Bb':'B flat'};
@@ -892,7 +897,8 @@ input[type=range]::-webkit-slider-thumb{
     if(!('speechSynthesis' in window))return;
     if(c.digit)speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(c.text);
-    u.rate=c.digit?1.15:1.0;u.volume=1;
+    u.rate=c.digit?1.15:1.0;u.volume=VOICE.vol;
+    if(VOICE.chosen)u.voice=VOICE.chosen;
     speechSynthesis.speak(u);
   }
 
@@ -925,11 +931,81 @@ input[type=range]::-webkit-slider-thumb{
       // Spoken confirmation for BOTH states (also unlocks TTS on iOS)
       const u=new SpeechSynthesisUtterance(
         VOICE.part>=0?'Voice cues: saxophone '+(VOICE.part+1):'Voice cues off');
+      if(VOICE.chosen)u.voice=VOICE.chosen;
+      u.rate=1.0;u.volume=VOICE.vol;
       speechSynthesis.speak(u);
+      populateVoicesSoon();
     }
   }));
   if(VOICE.part>=0){VOICE.cues=buildCues(VOICE.part);resyncCues(tick);}
   setVoiceUI();
+
+  // Voice selector: choose the speaking voice from what the device offers.
+  // Saved by NAME (list order isn't stable across loads), restored on load,
+  // and previewed aloud on change. English voices only, unless none exist.
+  const voiceSelect=document.getElementById('voice-select');
+  function resolveChosen(){
+    const saved=localStorage.getItem('hocketVoiceName')||'';
+    VOICE.chosen=VOICE.voiceList.find(v=>v.name===saved)||null;
+  }
+  function populateVoices(){
+    if(!('speechSynthesis' in window))return;
+    const all=speechSynthesis.getVoices();
+    if(!all.length)return;
+    const en=all.filter(v=>(v.lang||'').toLowerCase().startsWith('en'));
+    const list=en.length?en:all;
+    // Skip rebuild if nothing changed (avoids yanking an open dropdown shut)
+    if(list.length===VOICE.voiceList.length&&list.every((v,i)=>v.name===VOICE.voiceList[i].name))return;
+    VOICE.voiceList=list;
+    resolveChosen();
+    voiceSelect.innerHTML='';
+    const dflt=document.createElement('option');
+    dflt.value='';dflt.textContent='Default voice';
+    voiceSelect.appendChild(dflt);
+    VOICE.voiceList.forEach(v=>{
+      const opt=document.createElement('option');
+      opt.value=v.name;
+      opt.textContent=v.name.replace(/Google |Microsoft |\s+\(.*\)$/g,'');
+      if(VOICE.chosen&&v.name===VOICE.chosen.name)opt.selected=true;
+      voiceSelect.appendChild(opt);
+    });
+  }
+  // iOS Safari quirk: getVoices() is empty until speech has been used once,
+  // and voiceschanged may never fire. Retry after any interaction that
+  // triggers speech, on a short backoff.
+  function populateVoicesSoon(){[150,600,1500,3500].forEach(ms=>setTimeout(populateVoices,ms));}
+  voiceSelect.addEventListener('change',function(){
+    localStorage.setItem('hocketVoiceName',this.value);
+    resolveChosen();
+    if('speechSynthesis' in window){
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance('Change to: F sharp, blue');
+      if(VOICE.chosen)u.voice=VOICE.chosen;
+      u.volume=VOICE.vol;
+      speechSynthesis.speak(u);
+    }
+  });
+  // Voice volume: saved per device, previewed aloud when the finger lifts
+  const voiceVol=document.getElementById('voice-vol');
+  voiceVol.value=VOICE.vol;
+  voiceVol.addEventListener('input',function(){
+    VOICE.vol=parseFloat(this.value);
+    localStorage.setItem('hocketVoiceVol',VOICE.vol);
+  });
+  voiceVol.addEventListener('change',function(){
+    if(!('speechSynthesis' in window))return;
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance('1, 2, 3, 4');
+    if(VOICE.chosen)u.voice=VOICE.chosen;
+    u.volume=VOICE.vol;
+    speechSynthesis.speak(u);
+  });
+  if('speechSynthesis' in window){
+    populateVoices();
+    speechSynthesis.onvoiceschanged=populateVoices;
+    populateVoicesSoon();
+    window.addEventListener('pointerdown',populateVoicesSoon,{once:true});
+  }
 
   // Keep the cue pointer honest across local transport moves
   ['h-play','h-skip-back','h-skip-fwd','h-reset'].forEach(id=>{
