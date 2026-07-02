@@ -42,7 +42,6 @@ h1{font-family:var(--ff);font-size:clamp(13px,2.8vw,18px);font-weight:300;letter
   width:80px;height:52px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:2px;flex-shrink:0;
 }
-.btn-skip:hover{background:#acc6a1;border-color:#111;}
 .btn-skip .arrow{font-size:15px;line-height:1;color:#111;}
 .btn-skip .label{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:0.1em;text-transform:uppercase;color:#111;opacity:0.7;}
 .btn-play{
@@ -52,7 +51,11 @@ h1{font-family:var(--ff);font-size:clamp(13px,2.8vw,18px);font-weight:300;letter
   width:120px;height:52px;
   display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;
 }
-.btn-play:hover,.btn-play.playing{background:#2e8b57;border-color:#2e8b57;color:#fff;}
+.btn-play.playing{background:#2e8b57;border-color:#2e8b57;color:#fff;}
+@media(hover:hover){
+  .btn-skip:hover{background:#acc6a1;border-color:#111;}
+  .btn-play:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}
+}
 .btn-play .play-icon{font-size:18px;line-height:1;}
 
 .controls{
@@ -68,9 +71,10 @@ h1{font-family:var(--ff);font-size:clamp(13px,2.8vw,18px);font-weight:300;letter
   font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;
   cursor:pointer;transition:all 0.2s;white-space:nowrap;
 }
-.ctrl-btn:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}
+@media(hover:hover){.ctrl-btn:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}}
 .ctrl-btn.on{background:#2e8b57;border-color:#2e8b57;color:#fff;}
 .ctrl-group{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:9px;color:#111;letter-spacing:0.06em;text-transform:uppercase;}
+.voice-sax{padding:4px 8px;}
 input[type=range]{
   -webkit-appearance:none;appearance:none;width:55px;height:2px;
   background:rgba(0,0,0,0.15);border-radius:1px;outline:none;cursor:pointer;
@@ -97,7 +101,7 @@ input[type=range]::-webkit-slider-thumb{
   font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;
   text-decoration:none;transition:all 0.2s;
 }
-.home-link:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}
+@media(hover:hover){.home-link:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}}
 
 </style>
 </head>
@@ -147,7 +151,19 @@ input[type=range]::-webkit-slider-thumb{
       <span id="h-lookahead-out">3 bars</span>
     </div>
     <button class="ctrl-btn" id="sync-toggle">&#9737; Sync</button>
+    <div class="ctrl-group" id="voice-group">
+      <label>Voice</label>
+      <button class="ctrl-btn voice-sax" data-i="0">S1</button>
+      <button class="ctrl-btn voice-sax" data-i="1">S2</button>
+      <button class="ctrl-btn voice-sax" data-i="2">S3</button>
+      <button class="ctrl-btn voice-sax" data-i="3">S4</button>
+    </div>
     <button class="ctrl-btn" id="sync-sound" style="display:none">&#9836; Sound</button>
+    <div class="ctrl-group" id="nudge-group" style="display:none">
+      <label for="h-nudge">Nudge</label>
+      <input type="range" id="h-nudge" min="-200" max="200" step="5" value="0">
+      <span id="h-nudge-out">0ms</span>
+    </div>
   </div>
   <canvas id="tl-canvas"></canvas>
   <div class="progress-wrap"><div class="progress-bar" id="h-bar"></div></div>
@@ -264,13 +280,14 @@ input[type=range]::-webkit-slider-thumb{
       }
     }
   }
-  function playMetroClick(){
+  function playMetroClick(beat,when){
     if(!audioCtx||!metroOn)return;
+    const down=((beat%BEATS_PER_BAR)+BEATS_PER_BAR)%BEATS_PER_BAR===0;
+    const t=Math.max(when||audioCtx.currentTime,audioCtx.currentTime);
     const osc=audioCtx.createOscillator(),g=audioCtx.createGain();
-    osc.type='sine';osc.frequency.value=880;
-    const now=audioCtx.currentTime;
-    g.gain.setValueAtTime(0.3,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.06);
-    osc.connect(g);g.connect(masterGain);osc.start(now);osc.stop(now+0.08);
+    osc.type='sine';osc.frequency.value=down?1320:880;
+    g.gain.setValueAtTime(down?0.4:0.28,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.06);
+    osc.connect(g);g.connect(masterGain);osc.start(t);osc.stop(t+0.09);
   }
 
   function getActive(part,t){for(let ev of part.events)if(t>=ev.s&&t<ev.e)return ev;return null;}
@@ -286,14 +303,15 @@ input[type=range]::-webkit-slider-thumb{
     return d;
   }
 
-  function updateAudio(t){
+  function updateAudio(t,withClick){
     if(!audioCtx)return;
     PARTS.forEach((part,i)=>{
       const ev=getActive(part,t),midi=ev?ev.n:null;
       if(midi!==activeNotes[i]){activeNotes[i]=midi;midi!==null?startNote(i,midi):stopNote(i);}
     });
+    if(withClick===false)return;
     const beat=Math.floor(t/TPB);
-    if(beat!==lastBeat){lastBeat=beat;playMetroClick();}
+    if(beat!==lastBeat){lastBeat=beat;playMetroClick(beat);}
   }
 
   // ── CIRCLE CANVAS ──────────────────────────────────────────────
@@ -320,8 +338,9 @@ input[type=range]::-webkit-slider-thumb{
     const isDown=(Math.floor(t/TPB)%BEATS_PER_BAR)===0;
     const globalPulse=isDown?beatDecay*0.6:beatDecay*0.3;
 
+    const inCI=t<0;
     const barNum=Math.floor(t/TPB_BAR)+1;
-    const beatInBar=(Math.floor(t/TPB)%BEATS_PER_BAR)+1;
+    const beatInBar=((Math.floor(t/TPB)%BEATS_PER_BAR)+BEATS_PER_BAR)%BEATS_PER_BAR+1;
     const COUNT_IN_TICKS=TPB_BAR*1; // 1 bar (4 beats) countdown
 
     // Guide circle
@@ -451,27 +470,37 @@ input[type=range]::-webkit-slider-thumb{
       }
     });
 
-    // Centre - bar number + beat dots
+    // Centre - bar number + beat dots (or count-in)
     cctx.save();cctx.textAlign='center';cctx.textBaseline='middle';
     cctx.font=`400 ${S*0.016}px ${FF}`;
-    cctx.fillStyle='rgba(255,255,255,0.45)';
-    cctx.fillText('BAR',CX,CY-S*0.09);
-    cctx.font=`300 ${S*0.105}px ${FF}`;
-    cctx.fillStyle=`rgba(255,255,255,${0.7+globalPulse*0.3})`;
-    cctx.fillText(barNum,CX,CY-S*0.016);
+    if(inCI){
+      const beatsLeft=Math.ceil(-t/TPB);
+      cctx.fillStyle='rgba(255,216,74,0.8)';
+      cctx.fillText('COUNT-IN',CX,CY-S*0.09);
+      cctx.font=`300 ${S*0.13}px ${FF}`;
+      cctx.fillStyle=`rgba(255,216,74,${0.75+globalPulse*0.25})`;
+      cctx.fillText(beatsLeft,CX,CY-S*0.016);
+    } else {
+      cctx.fillStyle='rgba(255,255,255,0.45)';
+      cctx.fillText('BAR',CX,CY-S*0.09);
+      cctx.font=`300 ${S*0.105}px ${FF}`;
+      cctx.fillStyle=`rgba(255,255,255,${0.7+globalPulse*0.3})`;
+      cctx.fillText(barNum,CX,CY-S*0.016);
+    }
     const dotSp=S*0.026,dotY=CY+S*0.05,dotR=S*0.0065;
     for(let d=0;d<4;d++){
       const dx=CX+(d-1.5)*dotSp;
       const isA=d===(beatInBar-1);
+      const dc=inCI?'255,216,74':'255,255,255';
       cctx.save();
-      if(isA){cctx.shadowColor='rgba(255,255,255,0.6)';cctx.shadowBlur=S*0.01+globalPulse*S*0.016;}
+      if(isA){cctx.shadowColor=`rgba(${dc},0.6)`;cctx.shadowBlur=S*0.01+globalPulse*S*0.016;}
       cctx.beginPath();cctx.arc(dx,dotY,isA?dotR+S*0.002+globalPulse*S*0.003:dotR-S*0.001,0,Math.PI*2);
-      cctx.fillStyle=isA?`rgba(255,255,255,${0.7+globalPulse*0.3})`:'rgba(255,255,255,0.18)';
+      cctx.fillStyle=isA?`rgba(${dc},${0.7+globalPulse*0.3})`:`rgba(${dc},0.18)`;
       cctx.fill();cctx.restore();
     }
     cctx.restore();
 
-    document.getElementById('h-bar').style.width=((t/MAX_TICK)*100).toFixed(1)+'%';
+    document.getElementById('h-bar').style.width=(Math.max(0,t/MAX_TICK)*100).toFixed(1)+'%';
   }
 
   // ── TIMELINE CANVAS ────────────────────────────────────────────
@@ -574,10 +603,12 @@ input[type=range]::-webkit-slider-thumb{
       tlctx.save();
       tlctx.strokeStyle='rgba(17,17,17,0.22)';tlctx.lineWidth=1;
       tlctx.beginPath();tlctx.moveTo(bx,TL_TOP);tlctx.lineTo(bx,LANES_B);tlctx.stroke();
-      tlctx.textAlign='center';tlctx.textBaseline='top';
-      tlctx.font=`700 10px ${FM}`;
-      tlctx.fillStyle='rgba(17,17,17,0.55)';
-      tlctx.fillText('BAR '+(b+1),bx,LANES_B+4);
+      if(b>=0){
+        tlctx.textAlign='center';tlctx.textBaseline='top';
+        tlctx.font=`700 10px ${FM}`;
+        tlctx.fillStyle='rgba(17,17,17,0.55)';
+        tlctx.fillText('BAR '+(b+1),bx,LANES_B+4);
+      }
       tlctx.restore();
     }
     for(let beat=Math.floor(t/TPB);beat<=Math.ceil((t+laT)/TPB);beat++){
@@ -631,7 +662,7 @@ input[type=range]::-webkit-slider-thumb{
       tick=MAX_TICK;playing=false;stopAllNotes();
       document.getElementById('h-play').innerHTML='<span class="play-icon">&#9654;</span><span>Play</span>';
     }
-    updateAudio(tick);drawCircle(tick);drawTimeline(tick);
+    updateAudio(tick);checkVoiceCues(tick);drawCircle(tick);drawTimeline(tick);
     if(playing)raf=requestAnimationFrame(frame);
   }
 
@@ -674,9 +705,18 @@ input[type=range]::-webkit-slider-thumb{
   // The bridge (hocket-bridge.js) follows MIDI clock from Ableton and
   // broadcasts {t:'s', tick, playing, bpm}. All connected devices chase
   // the same clock, so 4 iPads on one Wi-Fi network stay locked.
-  const SYNC={on:false,ws:null,last:null,bpm:BPM,url:null,retry:null,sound:false,raf:null,wasPlaying:false};
+  const SYNC={on:false,ws:null,last:null,bpm:BPM,url:null,retry:null,sound:false,raf:null,wasPlaying:false,
+              rtt:null,ping:null,schedBeat:null,offMs:parseFloat(localStorage.getItem('hocketNudge')||'0')};
   const syncBtn=document.getElementById('sync-toggle');
   const soundBtn=document.getElementById('sync-sound');
+  const nudgeGroup=document.getElementById('nudge-group');
+  const nudgeIn=document.getElementById('h-nudge'),nudgeOut=document.getElementById('h-nudge-out');
+  nudgeIn.value=SYNC.offMs;nudgeOut.textContent=(SYNC.offMs>0?'+':'')+SYNC.offMs+'ms';
+  nudgeIn.addEventListener('input',function(){
+    SYNC.offMs=parseFloat(this.value);
+    localStorage.setItem('hocketNudge',SYNC.offMs);
+    nudgeOut.textContent=(SYNC.offMs>0?'+':'')+SYNC.offMs+'ms';
+  });
   const lockEls=['h-play','h-skip-back','h-skip-fwd','h-reset','h-speed'].map(id=>document.getElementById(id));
 
   function setSyncUI(state){ // 'off' | 'ok' | 'err'
@@ -685,6 +725,7 @@ input[type=range]::-webkit-slider-thumb{
     syncBtn.innerHTML=state==='ok'?'&#9737; Synced':(state==='err'?'&#9737; Sync&hellip;':'&#9737; Sync');
     lockEls.forEach(el=>el.classList.toggle('sync-lock',state!=='off'));
     soundBtn.style.display=state==='off'?'none':'';
+    nudgeGroup.style.display=state==='off'?'none':'';
   }
 
   function syncConnect(url){
@@ -694,18 +735,31 @@ input[type=range]::-webkit-slider-thumb{
     let ws;
     try{ws=new WebSocket(url);}catch(e){scheduleRetry();return;}
     SYNC.ws=ws;
-    ws.onopen=()=>{setSyncUI('ok');if(!SYNC.raf)SYNC.raf=requestAnimationFrame(syncFrame);};
+    ws.onopen=()=>{
+      setSyncUI('ok');
+      if(!SYNC.raf)SYNC.raf=requestAnimationFrame(syncFrame);
+      clearInterval(SYNC.ping);
+      SYNC.ping=setInterval(()=>{
+        if(ws.readyState===1)ws.send(JSON.stringify({t:'p',c:performance.now()}));
+      },2000);
+      ws.send(JSON.stringify({t:'p',c:performance.now()}));
+    };
     ws.onmessage=ev=>{
       let m;try{m=JSON.parse(ev.data);}catch(e){return;}
+      if(m.t==='p'){
+        const r=performance.now()-m.c;
+        SYNC.rtt=SYNC.rtt===null?r:SYNC.rtt*0.7+r*0.3;
+        return;
+      }
       if(m.t==='s'||m.t==='hi'){
         m.rx=performance.now();
         if(m.bpm>20&&m.bpm<400)SYNC.bpm=m.bpm;
-        if(SYNC.wasPlaying&&!m.playing){stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;}
+        if(SYNC.wasPlaying&&!m.playing){stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;SYNC.schedBeat=null;resyncCues(tick);}
         SYNC.wasPlaying=!!m.playing;
         SYNC.last=m;
       }
     };
-    ws.onclose=()=>{if(SYNC.on){setSyncUI('err');scheduleRetry();}};
+    ws.onclose=()=>{clearInterval(SYNC.ping);if(SYNC.on){setSyncUI('err');scheduleRetry();}};
     ws.onerror=()=>{try{ws.close();}catch(e){}};
   }
   function scheduleRetry(){
@@ -713,12 +767,41 @@ input[type=range]::-webkit-slider-thumb{
     SYNC.retry=setTimeout(()=>{if(SYNC.on)syncConnect(SYNC.url);},2000);
   }
   function syncStop(){
-    SYNC.on=false;clearTimeout(SYNC.retry);
+    SYNC.on=false;clearTimeout(SYNC.retry);clearInterval(SYNC.ping);
     if(SYNC.ws){try{SYNC.ws.close();}catch(e){}}
-    SYNC.ws=null;SYNC.last=null;
+    SYNC.ws=null;SYNC.last=null;SYNC.rtt=null;
     if(SYNC.raf){cancelAnimationFrame(SYNC.raf);SYNC.raf=null;}
     stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;
-    setSyncUI('off');
+    tick=Math.max(0,tick);
+    setSyncUI('off');drawCircle(tick);drawTimeline(tick);
+  }
+
+  // Beat-accurate click: derive upcoming beat times from the raw network
+  // estimate and schedule them ahead on the Web Audio clock. Once a click is
+  // booked its timing never moves, so beats stay rock-steady even while the
+  // sync estimate wobbles a few ms between messages.
+  function scheduleClicks(m){
+    if(!audioCtx||!metroOn)return;
+    const LOOK_MS=180;
+    const tickMs=(60000/SYNC.bpm)/TPB;
+    const compMs=(SYNC.rtt!==null?SYNC.rtt/2:0)+SYNC.offMs;
+    const pn=performance.now();
+    const tickNow=m.tick+(pn-m.rx+compMs)/tickMs;
+    const GRACE=40/tickMs; // beats up to 40ms in the past still fire (clamped to now)
+    let nextBeat=Math.floor((tickNow-GRACE)/TPB)+1;
+    if(SYNC.schedBeat!==null){
+      // stale after a locate the snap-guard didn't catch
+      if(SYNC.schedBeat<nextBeat-2||SYNC.schedBeat>nextBeat+4)SYNC.schedBeat=null;
+      else nextBeat=Math.max(nextBeat,SYNC.schedBeat+1);
+    }
+    while(true){
+      const dtMs=(nextBeat*TPB-tickNow)*tickMs;
+      if(dtMs>LOOK_MS)break;
+      if(nextBeat*TPB>MAX_TICK)break;
+      playMetroClick(nextBeat,audioCtx.currentTime+Math.max(dtMs,1)/1000);
+      SYNC.schedBeat=nextBeat;
+      nextBeat++;
+    }
   }
 
   function syncFrame(){
@@ -728,14 +811,17 @@ input[type=range]::-webkit-slider-thumb{
       let target=m.tick;
       if(m.playing){
         const tickMs=(60000/SYNC.bpm)/TPB;
-        target=m.tick+(performance.now()-m.rx)/tickMs;
+        const compMs=(SYNC.rtt!==null?SYNC.rtt/2:0)+SYNC.offMs;
+        target=m.tick+(performance.now()-m.rx+compMs)/tickMs;
       }
-      target=Math.max(0,Math.min(MAX_TICK,target));
-      // Chase the bridge clock: snap on big jumps, glide on jitter
-      if(Math.abs(target-tick)>TPB_BAR){tick=target;stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;}
+      target=Math.min(MAX_TICK,target); // negative allowed: count-in runs before bar 1
+      // Chase the bridge clock: snap on big jumps, glide on jitter.
+      // The GLIDED tick drives visuals only; clicks are scheduled from the
+      // raw network estimate on the sample-accurate audio clock below.
+      if(Math.abs(target-tick)>TPB_BAR){tick=target;stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;SYNC.schedBeat=null;resyncCues(tick);}
       else tick+=(target-tick)*0.35;
-      if(m.playing&&SYNC.sound&&audioCtx)updateAudio(tick);
-      else if(m.playing){const beat=Math.floor(tick/TPB);if(beat!==lastBeat){lastBeat=beat;playMetroClick();}}
+      if(m.playing&&SYNC.sound&&audioCtx)updateAudio(tick,false);
+      if(m.playing){scheduleClicks(m);checkVoiceCues(tick);}
       drawCircle(tick);drawTimeline(tick);
     }
     SYNC.raf=requestAnimationFrame(syncFrame);
@@ -754,6 +840,100 @@ input[type=range]::-webkit-slider-thumb{
     SYNC.sound=!SYNC.sound;this.classList.toggle('on',SYNC.sound);
     if(SYNC.sound){initAudio();if(audioCtx.state==='suspended')audioCtx.resume();}
     else{stopAllNotes();activeNotes=[null,null,null,null];}
+  });
+
+  // ── VOICE CUES ─────────────────────────────────────────────────
+  // Per-device spoken guide for ONE part: two bars before each change it
+  // announces the note ("Change to: F sharp, blue"), then counts "1 2 3 4"
+  // on the last four beats, landing the change on the next beat. Uses the
+  // built-in speech synthesiser; the click remains the precision reference,
+  // the voice is the instruction.
+  const VOICE={part:parseInt(localStorage.getItem('hocketVoicePart')||'-1',10),cues:[],idx:0};
+  if(!(VOICE.part>=0&&VOICE.part<=3))VOICE.part=-1;
+  localStorage.removeItem('hocketVoice'); // clear old pre-toggle storage key, if present
+  const voiceBtns=[...document.querySelectorAll('.voice-sax')];
+  const COLOUR_WORD={[COL.red]:'red',[COL.yellow]:'yellow',[COL.green]:'green',[COL.blue]:'blue'};
+  const ACC_WORD={'C#':'C sharp','Eb':'E flat','F#':'F sharp','Ab':'A flat','Bb':'B flat'};
+
+  function spokenNote(midi){
+    const base=NN[midi%12];
+    return (ACC_WORD[base]||base)+', '+(COLOUR_WORD[nc(midi)]||'');
+  }
+
+  function buildCues(pi){
+    const evs=PARTS[pi].events;
+    // Announcement lands 2 bars out when there's room; in fast sections it
+    // slides later (just after the previous change) so the note name is
+    // never dropped. Needs >=2 beats clear of the count-in digits.
+    const annT=evs.map((ev,k)=>{
+      let at=ev.s-8*TPB;
+      if(k>0)at=Math.max(at,evs[k-1].s+TPB);
+      return at<=ev.s-6*TPB?at:null;
+    });
+    const cues=[];
+    evs.forEach((ev,k)=>{
+      const prev=k>0?evs[k-1]:null;
+      const entry=prev&&ev.s-prev.e>0;
+      const verb=entry?'Come in: ':(prev?'Change to: ':'Starting on: ');
+      if(annT[k]!==null)cues.push({t:annT[k],text:verb+spokenNote(ev.n),digit:false});
+      // Counted lead-in on the last 4 beats
+      for(let d=1;d<=4;d++)cues.push({t:ev.s-(5-d)*TPB,text:String(d),digit:true});
+      // Spoken "rest" at note end when a real gap follows and it won't
+      // scramble the order of the next announcement
+      const nxt=evs[k+1];
+      if(nxt&&nxt.s-ev.e>=4*TPB&&(annT[k+1]===null||annT[k+1]>ev.e+TPB))
+        cues.push({t:ev.e,text:'rest',digit:true});
+    });
+    cues.sort((a,b)=>a.t-b.t);
+    return cues;
+  }
+
+  function speakCue(c){
+    if(!('speechSynthesis' in window))return;
+    if(c.digit)speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(c.text);
+    u.rate=c.digit?1.15:1.0;u.volume=1;
+    speechSynthesis.speak(u);
+  }
+
+  function resyncCues(t){
+    if('speechSynthesis' in window)speechSynthesis.cancel();
+    VOICE.idx=0;
+    while(VOICE.idx<VOICE.cues.length&&VOICE.cues[VOICE.idx].t<=t)VOICE.idx++;
+  }
+
+  function checkVoiceCues(t){
+    if(VOICE.part<0||!VOICE.cues.length)return;
+    const bpmEff=SYNC.on?SYNC.bpm:BPM*speed;
+    const leadTicks=0.12*TPB*bpmEff/60; // fire ~120ms early to swallow TTS latency
+    while(VOICE.idx<VOICE.cues.length&&VOICE.cues[VOICE.idx].t<=t+leadTicks){
+      const c=VOICE.cues[VOICE.idx++];
+      if(c.t>=t-TPB)speakCue(c); // skip anything more than a beat stale
+    }
+  }
+
+  function setVoiceUI(){
+    voiceBtns.forEach(b=>b.classList.toggle('on',parseInt(b.dataset.i,10)===VOICE.part));
+  }
+  voiceBtns.forEach(btn=>btn.addEventListener('click',function(){
+    const i=parseInt(this.dataset.i,10);
+    VOICE.part=(VOICE.part===i)?-1:i;
+    localStorage.setItem('hocketVoicePart',VOICE.part);
+    VOICE.cues=VOICE.part>=0?buildCues(VOICE.part):[];
+    resyncCues(tick);setVoiceUI();
+    if('speechSynthesis' in window){
+      // Spoken confirmation for BOTH states (also unlocks TTS on iOS)
+      const u=new SpeechSynthesisUtterance(
+        VOICE.part>=0?'Voice cues: saxophone '+(VOICE.part+1):'Voice cues off');
+      speechSynthesis.speak(u);
+    }
+  }));
+  if(VOICE.part>=0){VOICE.cues=buildCues(VOICE.part);resyncCues(tick);}
+  setVoiceUI();
+
+  // Keep the cue pointer honest across local transport moves
+  ['h-play','h-skip-back','h-skip-fwd','h-reset'].forEach(id=>{
+    document.getElementById(id).addEventListener('click',()=>resyncCues(tick));
   });
 
   // Auto-connect when served by the bridge, or via ?sync=host:port
