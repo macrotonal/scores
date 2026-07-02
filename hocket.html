@@ -145,6 +145,7 @@ input[type=range]::-webkit-slider-thumb{
       <label for="h-vol">Vol</label>
       <input type="range" id="h-vol" min="0" max="1" step="0.05" value="0.5">
     </div>
+    <button class="ctrl-btn" id="sax-mute">&#128263; Mute Saxes</button>
     <div class="ctrl-group">
       <label for="h-lookahead">Ahead</label>
       <input type="range" id="h-lookahead" min="1" max="6" step="0.5" value="3">
@@ -239,11 +240,11 @@ input[type=range]::-webkit-slider-thumb{
   ];
 
   const PNAMES=['Sax 1','Sax 2','Sax 3','Sax 4'];
-  let tick=0,playing=false,lastTime=null,speed=1,raf=null;
+  let tick=0,playing=false,speed=1,raf=null;
   let audioCtx=null,masterGain=null;
-  let oscNodes=[null,null,null,null],gainNodes=[null,null,null,null],activeNotes=[null,null,null,null];
+  let activeNotes=[null,null,null,null]; // retained for state resets; scheduling below owns audio
   let soloState=[false,false,false,false];
-  let metroOn=false,lastBeat=-1,lookahead=3;
+  let metroOn=false,lastBeat=-1,lookahead=3,saxMuted=false;
 
   function initAudio(){
     if(audioCtx)return;
@@ -252,36 +253,86 @@ input[type=range]::-webkit-slider-thumb{
     masterGain.gain.value=parseFloat(document.getElementById('h-vol').value);
     masterGain.connect(audioCtx.destination);
   }
-  function getPartGain(i){return(soloState.some(Boolean)&&!soloState[i])?0:0.18;}
-  function startNote(i,midi){
-    stopNote(i);
-    const col=nc(midi),cents=CENT_OFFSETS[col]||0;
-    const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
-    osc.type='sine';osc.frequency.value=mhz(midi,cents);
+  function getPartGain(i){return(saxMuted||(soloState.some(Boolean)&&!soloState[i]))?0:0.18;}
+
+  // ── SCHEDULED NOTE ENGINE ──────────────────────────────────────
+  // Guide tones are booked ahead on the Web Audio clock exactly like the
+  // click: each note's attack and release are scheduled at precise audio
+  // times ~250ms before they're due, so a main-thread stall (drawing, GC,
+  // speech synthesis) can never land a note change late.
+  let schedNotes=[];             // {osc,gain,part,endTick,startAt,ended}
+  const partIdx=[0,0,0,0];       // next unscheduled event per part
+  const NOTE_LOOK_MS=250;
+
+  function killAllNotes(){
+    if(!audioCtx){schedNotes=[];return;}
     const now=audioCtx.currentTime;
-    gain.gain.setValueAtTime(0,now);gain.gain.linearRampToValueAtTime(getPartGain(i),now+0.04);
-    osc.connect(gain);gain.connect(masterGain);osc.start();
-    oscNodes[i]=osc;gainNodes[i]=gain;
+    schedNotes.forEach(n=>{
+      try{
+        n.gain.gain.cancelScheduledValues(now);
+        n.gain.gain.setValueAtTime(n.gain.gain.value,now);
+        n.gain.gain.linearRampToValueAtTime(0,now+0.05);
+        n.osc.stop(now+0.12);
+      }catch(e){}
+    });
+    schedNotes=[];
   }
-  function stopNote(i){
-    if(!oscNodes[i])return;
-    const now=audioCtx.currentTime;
-    gainNodes[i].gain.setValueAtTime(gainNodes[i].gain.value,now);
-    gainNodes[i].gain.linearRampToValueAtTime(0,now+0.06);
-    const o=oscNodes[i];setTimeout(()=>{try{o.stop();}catch(e){}},120);
-    oscNodes[i]=null;gainNodes[i]=null;
+  function resetNoteScheduler(t){
+    killAllNotes();
+    PARTS.forEach((p,i)=>{
+      let k=p.events.findIndex(ev=>ev.e>t);
+      partIdx[i]=k<0?p.events.length:k;
+    });
   }
-  function stopAllNotes(){for(let i=0;i<4;i++)stopNote(i);activeNotes=[null,null,null,null];}
-  function refreshGains(){
+  function stopAllNotes(){killAllNotes();activeNotes=[null,null,null,null];}
+
+  function scheduleNotes(tickNow,effTickMs){
+    if(!audioCtx)return;
     for(let i=0;i<4;i++){
-      if(gainNodes[i]){
-        const now=audioCtx.currentTime;
-        gainNodes[i].gain.cancelScheduledValues(now);
-        gainNodes[i].gain.setValueAtTime(gainNodes[i].gain.value,now);
-        gainNodes[i].gain.linearRampToValueAtTime(getPartGain(i),now+0.05);
+      const evs=PARTS[i].events;
+      while(partIdx[i]<evs.length){
+        const ev=evs[partIdx[i]];
+        const dtMs=(ev.s-tickNow)*effTickMs;
+        if(dtMs>NOTE_LOOK_MS)break;
+        const when=audioCtx.currentTime+Math.max(dtMs,1)/1000;
+        const col=nc(ev.n),cents=CENT_OFFSETS[col]||0;
+        const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+        osc.type='sine';osc.frequency.value=mhz(ev.n,cents);
+        gain.gain.setValueAtTime(0,when);
+        gain.gain.linearRampToValueAtTime(getPartGain(i),when+0.04);
+        osc.connect(gain);gain.connect(masterGain);osc.start(when);
+        schedNotes.push({osc,gain,part:i,endTick:ev.e,startAt:when,ended:false});
+        partIdx[i]++;
       }
     }
+    // Book releases as they enter the horizon; prune long-finished nodes
+    const now=audioCtx.currentTime;
+    schedNotes.forEach(n=>{
+      if(n.ended)return;
+      const dtMs=(n.endTick-tickNow)*effTickMs;
+      if(dtMs>NOTE_LOOK_MS)return;
+      const when=now+Math.max(dtMs,1)/1000;
+      try{
+        n.gain.gain.setValueAtTime(getPartGain(n.part),when);
+        n.gain.gain.linearRampToValueAtTime(0,when+0.06);
+        n.osc.stop(when+0.12);
+      }catch(e){}
+      n.ended=true;n.endAt=when;
+    });
+    schedNotes=schedNotes.filter(n=>!(n.ended&&n.endAt!==undefined&&now>n.endAt+0.5));
   }
+  function refreshGains(){
+    if(!audioCtx)return;
+    const now=audioCtx.currentTime;
+    schedNotes.forEach(n=>{
+      if(n.ended||n.startAt>now+0.01)return; // don't disturb booked attacks/releases
+      n.gain.gain.cancelScheduledValues(now);
+      n.gain.gain.setValueAtTime(n.gain.gain.value,now);
+      n.gain.gain.linearRampToValueAtTime(getPartGain(n.part),now+0.05);
+    });
+  }
+
+  const pendingClicks=[];
   function playMetroClick(beat,when){
     if(!audioCtx||!metroOn)return;
     const down=((beat%BEATS_PER_BAR)+BEATS_PER_BAR)%BEATS_PER_BAR===0;
@@ -290,6 +341,14 @@ input[type=range]::-webkit-slider-thumb{
     osc.type='sine';osc.frequency.value=down?1320:880;
     g.gain.setValueAtTime(down?0.4:0.28,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.06);
     osc.connect(g);g.connect(masterGain);osc.start(t);osc.stop(t+0.09);
+    pendingClicks.push(osc);
+    osc.onended=()=>{const i=pendingClicks.indexOf(osc);if(i>=0)pendingClicks.splice(i,1);};
+  }
+  // With a deep lookahead, clicks are booked up to 500ms out; kill them on
+  // stop/jump so pausing doesn't trail ghost clicks.
+  function cancelPendingClicks(){
+    pendingClicks.forEach(o=>{try{o.stop();}catch(e){}});
+    pendingClicks.length=0;
   }
 
   function getActive(part,t){for(let ev of part.events)if(t>=ev.s&&t<ev.e)return ev;return null;}
@@ -303,17 +362,6 @@ input[type=range]::-webkit-slider-thumb{
     let d=Infinity;
     for(let e of part.events)if(e.s>t&&e.s-t<d)d=e.s-t;
     return d;
-  }
-
-  function updateAudio(t,withClick){
-    if(!audioCtx)return;
-    PARTS.forEach((part,i)=>{
-      const ev=getActive(part,t),midi=ev?ev.n:null;
-      if(midi!==activeNotes[i]){activeNotes[i]=midi;midi!==null?startNote(i,midi):stopNote(i);}
-    });
-    if(withClick===false)return;
-    const beat=Math.floor(t/TPB);
-    if(beat!==lastBeat){lastBeat=beat;playMetroClick(beat);}
   }
 
   // ── CIRCLE CANVAS ──────────────────────────────────────────────
@@ -417,11 +465,16 @@ input[type=range]::-webkit-slider-thumb{
         cctx.restore();
       }
 
-      // Node fill
+      // Node fill (glow drawn as cheap alpha halos: canvas shadowBlur is a
+      // per-frame GPU sledgehammer on iPad and was a jank source)
       cctx.save();
       if(active!==null&&!muted){
-        cctx.shadowColor=noteC;
-        cctx.shadowBlur=S*0.025+ringPulse*S*0.02;
+        const glowR=NODE_R+S*0.014+ringPulse*S*0.012;
+        cctx.globalAlpha=0.16+ringPulse*0.1;
+        cctx.beginPath();cctx.arc(px,py,glowR+S*0.012,0,Math.PI*2);cctx.fillStyle=noteC;cctx.fill();
+        cctx.globalAlpha=0.28+ringPulse*0.12;
+        cctx.beginPath();cctx.arc(px,py,glowR,0,Math.PI*2);cctx.fillStyle=noteC;cctx.fill();
+        cctx.globalAlpha=1;
       }
       cctx.beginPath();cctx.arc(px,py,NODE_R,0,Math.PI*2);
       cctx.fillStyle=active!==null?(muted?'rgba(18,26,20,0.9)':noteC):'rgba(10,16,12,0.95)';
@@ -495,7 +548,12 @@ input[type=range]::-webkit-slider-thumb{
       const isA=d===(beatInBar-1);
       const dc=inCI?'255,216,74':'255,255,255';
       cctx.save();
-      if(isA){cctx.shadowColor=`rgba(${dc},0.6)`;cctx.shadowBlur=S*0.01+globalPulse*S*0.016;}
+      if(isA){
+        cctx.globalAlpha=0.25+globalPulse*0.2;
+        cctx.beginPath();cctx.arc(dx,dotY,dotR+S*0.006+globalPulse*S*0.005,0,Math.PI*2);
+        cctx.fillStyle=`rgb(${dc})`;cctx.fill();
+        cctx.globalAlpha=1;
+      }
       cctx.beginPath();cctx.arc(dx,dotY,isA?dotR+S*0.002+globalPulse*S*0.003:dotR-S*0.001,0,Math.PI*2);
       cctx.fillStyle=isA?`rgba(${dc},${0.7+globalPulse*0.3})`:`rgba(${dc},0.18)`;
       cctx.fill();cctx.restore();
@@ -645,6 +703,15 @@ input[type=range]::-webkit-slider-thumb{
   });
 
   document.getElementById('h-vol').addEventListener('input',function(){if(masterGain)masterGain.gain.value=parseFloat(this.value);});
+  const saxMuteBtn=document.getElementById('sax-mute');
+  saxMuted=localStorage.getItem('hocketSaxMuted')==='1';
+  saxMuteBtn.classList.toggle('on',saxMuted);
+  saxMuteBtn.addEventListener('click',function(){
+    saxMuted=!saxMuted;
+    localStorage.setItem('hocketSaxMuted',saxMuted?'1':'0');
+    this.classList.toggle('on',saxMuted);
+    refreshGains();
+  });
   document.getElementById('h-lookahead').addEventListener('input',function(){
     lookahead=parseFloat(this.value);
     document.getElementById('h-lookahead-out').textContent=lookahead+' bars';
@@ -657,15 +724,49 @@ input[type=range]::-webkit-slider-thumb{
 
   function frame(ts){
     if(!playing)return;
-    if(lastTime===null)lastTime=ts;
-    const dt=ts-lastTime;lastTime=ts;
-    tick+=(dt/TICK_MS)*speed;
+    // Derive position from the wall-clock anchor (not accumulated frame
+    // deltas) so the visual playhead, note grid, and click grid can never
+    // drift apart — a stalled frame just catches up to the true position.
+    tick=localAnchorTick+(performance.now()-localAnchorPerf)/(TICK_MS/speed);
     if(tick>=MAX_TICK){
-      tick=MAX_TICK;playing=false;stopAllNotes();
+      tick=MAX_TICK;playing=false;stopAllNotes();cancelPendingClicks();
       document.getElementById('h-play').innerHTML='<span class="play-icon">&#9654;</span><span>Play</span>';
     }
-    updateAudio(tick);checkVoiceCues(tick);drawCircle(tick);drawTimeline(tick);
+    scheduleLocalAudio();checkVoiceCues(tick);drawCircle(tick);drawTimeline(tick);
     if(playing)raf=requestAnimationFrame(frame);
+  }
+
+  // Local audio scheduling: same fix as the synced clock, applied to local
+  // playback. Projects the beat grid from a performance.now() anchor rather
+  // than reacting to the RAF-driven `tick` value, and books clicks AND note
+  // changes ahead on Web Audio's own clock — so a canvas repaint or GC pause
+  // on the main thread can delay the *visual* playhead but never the audio.
+  let localAnchorPerf=null,localAnchorTick=0,localSchedBeat=null;
+  function resetLocalAnchor(t){
+    localAnchorPerf=performance.now();localAnchorTick=t;localSchedBeat=null;
+    if(audioCtx)resetNoteScheduler(t);
+  }
+  function scheduleLocalAudio(){
+    if(!playing||!audioCtx||localAnchorPerf===null)return;
+    const effTickMs=TICK_MS/speed;
+    const tickNow=localAnchorTick+(performance.now()-localAnchorPerf)/effTickMs;
+    scheduleNotes(tickNow,effTickMs);
+    if(!metroOn)return;
+    const LOOK_MS=500;
+    const GRACE=40/effTickMs;
+    let nextBeat=Math.floor((tickNow-GRACE)/TPB)+1;
+    if(localSchedBeat!==null){
+      if(localSchedBeat<nextBeat-2||localSchedBeat>nextBeat+4)localSchedBeat=null;
+      else nextBeat=Math.max(nextBeat,localSchedBeat+1);
+    }
+    while(true){
+      const dtMs=(nextBeat*TPB-tickNow)*effTickMs;
+      if(dtMs>LOOK_MS)break;
+      if(nextBeat*TPB>MAX_TICK)break;
+      playMetroClick(nextBeat,audioCtx.currentTime+Math.max(dtMs,1)/1000);
+      localSchedBeat=nextBeat;
+      nextBeat++;
+    }
   }
 
   document.getElementById('h-play').addEventListener('click',function(){
@@ -673,35 +774,47 @@ input[type=range]::-webkit-slider-thumb{
     if(tick>=MAX_TICK)tick=0;
     playing=!playing;
     if(playing){
-      lastTime=null;
+      resetLocalAnchor(tick);
       this.innerHTML='<span class="play-icon">&#9646;&#9646;</span><span>Pause</span>';
       raf=requestAnimationFrame(frame);
     } else {
-      stopAllNotes();
+      stopAllNotes();cancelPendingClicks();localSchedBeat=null;
       this.innerHTML='<span class="play-icon">&#9654;</span><span>Play</span>';
     }
   });
   document.getElementById('h-skip-back').addEventListener('click',function(){
     tick=Math.max(0,tick-TPB_BAR);
     stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;
+    cancelPendingClicks();resetLocalAnchor(tick);
     drawCircle(tick);drawTimeline(tick);
   });
   document.getElementById('h-skip-fwd').addEventListener('click',function(){
     tick=Math.min(MAX_TICK,tick+TPB_BAR);
     stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;
+    cancelPendingClicks();resetLocalAnchor(tick);
     drawCircle(tick);drawTimeline(tick);
   });
   document.getElementById('h-reset').addEventListener('click',function(){
-    playing=false;stopAllNotes();tick=0;lastTime=null;lastBeat=-1;
+    playing=false;stopAllNotes();tick=0;lastBeat=-1;
+    cancelPendingClicks();resetLocalAnchor(0);
     document.getElementById('h-play').innerHTML='<span class="play-icon">&#9654;</span><span>Play</span>';
     drawCircle(0);drawTimeline(0);
   });
   document.getElementById('h-speed').addEventListener('input',function(){
     speed=parseFloat(this.value);document.getElementById('h-speed-out').textContent=speed+'×';
+    if(playing)resetLocalAnchor(tick);
   });
 
   window.addEventListener('resize',()=>{resizeCircle();resizeTimeline();});
   resizeCircle();resizeTimeline();
+
+  // Backstop: keep the click queue topped up even if the frame loop stalls
+  // (TTS starting, GC pause, iOS throttling). Web Audio fires whatever is
+  // already booked regardless of the main thread; this just keeps booking.
+  setInterval(()=>{
+    if(SYNC.on&&SYNC.last&&SYNC.last.playing)scheduleClicks(SYNC.last);
+    else if(playing)scheduleLocalAudio();
+  },90);
 
   // ── EXTERNAL SYNC (Ableton → bridge → WebSocket) ───────────────
   // The bridge (hocket-bridge.js) follows MIDI clock from Ableton and
@@ -756,7 +869,8 @@ input[type=range]::-webkit-slider-thumb{
       if(m.t==='s'||m.t==='hi'){
         m.rx=performance.now();
         if(m.bpm>20&&m.bpm<400)SYNC.bpm=m.bpm;
-        if(SYNC.wasPlaying&&!m.playing){stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;SYNC.schedBeat=null;resyncCues(tick);}
+        if(SYNC.wasPlaying&&!m.playing){stopAllNotes();lastBeat=-1;SYNC.schedBeat=null;cancelPendingClicks();resyncCues(tick);}
+        if(!SYNC.wasPlaying&&m.playing&&audioCtx)resetNoteScheduler(m.tick);
         SYNC.wasPlaying=!!m.playing;
         SYNC.last=m;
       }
@@ -774,7 +888,7 @@ input[type=range]::-webkit-slider-thumb{
     SYNC.ws=null;SYNC.last=null;SYNC.rtt=null;
     if(SYNC.raf){cancelAnimationFrame(SYNC.raf);SYNC.raf=null;}
     stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;
-    tick=Math.max(0,tick);
+    cancelPendingClicks();tick=Math.max(0,tick);
     setSyncUI('off');drawCircle(tick);drawTimeline(tick);
   }
 
@@ -784,7 +898,7 @@ input[type=range]::-webkit-slider-thumb{
   // sync estimate wobbles a few ms between messages.
   function scheduleClicks(m){
     if(!audioCtx||!metroOn)return;
-    const LOOK_MS=180;
+    const LOOK_MS=500;
     const tickMs=(60000/SYNC.bpm)/TPB;
     const compMs=(SYNC.rtt!==null?SYNC.rtt/2:0)+SYNC.offMs;
     const pn=performance.now();
@@ -818,12 +932,19 @@ input[type=range]::-webkit-slider-thumb{
       }
       target=Math.min(MAX_TICK,target); // negative allowed: count-in runs before bar 1
       // Chase the bridge clock: snap on big jumps, glide on jitter.
-      // The GLIDED tick drives visuals only; clicks are scheduled from the
-      // raw network estimate on the sample-accurate audio clock below.
-      if(Math.abs(target-tick)>TPB_BAR){tick=target;stopAllNotes();activeNotes=[null,null,null,null];lastBeat=-1;SYNC.schedBeat=null;resyncCues(tick);}
+      // The GLIDED tick drives visuals only; clicks and note changes are
+      // scheduled from the raw network estimate on the audio clock below.
+      if(Math.abs(target-tick)>TPB_BAR){tick=target;stopAllNotes();lastBeat=-1;SYNC.schedBeat=null;cancelPendingClicks();if(audioCtx)resetNoteScheduler(target);resyncCues(tick);}
       else tick+=(target-tick)*0.35;
-      if(m.playing&&SYNC.sound&&audioCtx)updateAudio(tick,false);
-      if(m.playing){scheduleClicks(m);checkVoiceCues(tick);}
+      if(m.playing){
+        if(SYNC.sound&&audioCtx){
+          const tickMs=(60000/SYNC.bpm)/TPB;
+          const compMs=(SYNC.rtt!==null?SYNC.rtt/2:0)+SYNC.offMs;
+          const tickNow=m.tick+(performance.now()-m.rx+compMs)/tickMs;
+          scheduleNotes(tickNow,tickMs);
+        }
+        scheduleClicks(m);checkVoiceCues(tick);
+      }
       drawCircle(tick);drawTimeline(tick);
     }
     SYNC.raf=requestAnimationFrame(syncFrame);
@@ -840,13 +961,13 @@ input[type=range]::-webkit-slider-thumb{
   });
   soundBtn.addEventListener('click',function(){
     SYNC.sound=!SYNC.sound;this.classList.toggle('on',SYNC.sound);
-    if(SYNC.sound){initAudio();if(audioCtx.state==='suspended')audioCtx.resume();}
-    else{stopAllNotes();activeNotes=[null,null,null,null];}
+    if(SYNC.sound){initAudio();if(audioCtx.state==='suspended')audioCtx.resume();resetNoteScheduler(tick);}
+    else{stopAllNotes();}
   });
 
   // ── VOICE CUES ─────────────────────────────────────────────────
   // Per-device spoken guide for ONE part: two bars before each change it
-  // announces the note ("Change to: F sharp, blue"), then counts "1 2 3 4"
+  // announces the note ("F sharp, blue"), then counts "1 2 3 4"
   // on the last four beats, landing the change on the next beat. Uses the
   // built-in speech synthesiser; the click remains the precision reference,
   // the voice is the instruction.
@@ -877,10 +998,7 @@ input[type=range]::-webkit-slider-thumb{
     });
     const cues=[];
     evs.forEach((ev,k)=>{
-      const prev=k>0?evs[k-1]:null;
-      const entry=prev&&ev.s-prev.e>0;
-      const verb=entry?'Come in: ':(prev?'Change to: ':'Starting on: ');
-      if(annT[k]!==null)cues.push({t:annT[k],text:verb+spokenNote(ev.n),digit:false});
+      if(annT[k]!==null)cues.push({t:annT[k],text:spokenNote(ev.n),digit:false});
       // Counted lead-in on the last 4 beats
       for(let d=1;d<=4;d++)cues.push({t:ev.s-(5-d)*TPB,text:String(d),digit:true});
       // Spoken "rest" at note end when a real gap follows and it won't
@@ -895,7 +1013,9 @@ input[type=range]::-webkit-slider-thumb{
 
   function speakCue(c){
     if(!('speechSynthesis' in window))return;
-    if(c.digit)speechSynthesis.cancel();
+    // NB: no cancel() here — per-utterance cancel blocks the main thread on
+    // iOS for up to ~300ms, which was stalling both visuals and click.
+    // Digits are single short words at rate 1.15; they queue and flow.
     const u=new SpeechSynthesisUtterance(c.text);
     u.rate=c.digit?1.15:1.0;u.volume=VOICE.vol;
     if(VOICE.chosen)u.voice=VOICE.chosen;
@@ -903,7 +1023,7 @@ input[type=range]::-webkit-slider-thumb{
   }
 
   function resyncCues(t){
-    if('speechSynthesis' in window)speechSynthesis.cancel();
+    if('speechSynthesis' in window&&(speechSynthesis.speaking||speechSynthesis.pending))speechSynthesis.cancel();
     VOICE.idx=0;
     while(VOICE.idx<VOICE.cues.length&&VOICE.cues[VOICE.idx].t<=t)VOICE.idx++;
   }
@@ -979,7 +1099,7 @@ input[type=range]::-webkit-slider-thumb{
     resolveChosen();
     if('speechSynthesis' in window){
       speechSynthesis.cancel();
-      const u=new SpeechSynthesisUtterance('Change to: F sharp, blue');
+      const u=new SpeechSynthesisUtterance('F sharp, blue');
       if(VOICE.chosen)u.voice=VOICE.chosen;
       u.volume=VOICE.vol;
       speechSynthesis.speak(u);
