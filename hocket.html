@@ -6,7 +6,6 @@
 <meta name="color-scheme" content="light">
 <title>Golden Hour - Saxophone Hocket</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 @font-face {
@@ -30,7 +29,7 @@
   --border:rgba(46,139,87,0.15);--card:rgba(10,16,12,0.96);
   --green:#2e8b57;--gl:#5fb88a;
   --red:#ff6b55;--yellow:#ffd84a;--green-note:#4ed87a;--blue:#5ab4ff;
-  --ff:'Observer Cover','Futura','Century Gothic','Trebuchet MS',sans-serif;
+  --ff:'Raleway','Futura','Century Gothic','Trebuchet MS',sans-serif;
 }
 html,body{background:#014b4a!important;color:var(--text);
   font-family:var(--ff);
@@ -41,7 +40,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;background:no
 .wrap{position:relative;max-width:660px;margin:0 auto;}
 
 .header{text-align:center;margin-bottom:6px;}
-.eyebrow{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:7px;text-transform:uppercase;color:rgba(46,139,87,0.45);margin-bottom:6px;display:block;}
+.eyebrow{font-family:'Raleway',sans-serif;font-size:9px;letter-spacing:7px;text-transform:uppercase;color:rgba(46,139,87,0.45);margin-bottom:6px;display:block;}
 h1{font-family:var(--ff);font-size:clamp(13px,2.8vw,18px);font-weight:300;letter-spacing:0.12em;color:#e8f5ec;text-transform:uppercase;}
 .rule{display:none}
 
@@ -53,15 +52,15 @@ h1{font-family:var(--ff);font-size:clamp(13px,2.8vw,18px);font-weight:300;letter
 }
 .btn-skip{
   background:#fff;border:2px solid #111;color:#111;border-radius:4px;
-  font-family:'Space Mono',monospace;cursor:pointer;transition:all 0.2s;
+  font-family:'Raleway',sans-serif;cursor:pointer;transition:all 0.2s;
   width:80px;height:52px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:2px;flex-shrink:0;
 }
 .btn-skip .arrow{font-size:15px;line-height:1;color:#111;}
-.btn-skip .label{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:0.1em;text-transform:uppercase;color:#111;opacity:0.7;}
+.btn-skip .label{font-family:'Raleway',sans-serif;font-size:7px;letter-spacing:0.1em;text-transform:uppercase;color:#111;opacity:0.7;}
 .btn-play{
   background:#fff;border:2px solid #111;color:#111;border-radius:4px;
-  font-family:'Raleway','Space Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;
+  font-family:'Raleway',sans-serif;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;
   cursor:pointer;transition:all 0.2s;
   width:120px;height:52px;
   display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;
@@ -83,12 +82,12 @@ h1{font-family:var(--ff);font-size:clamp(13px,2.8vw,18px);font-weight:300;letter
 .sync-lock{opacity:0.3;pointer-events:none;}
 .ctrl-btn{
   background:#fff;border:2px solid #111;color:#111;padding:4px 12px;border-radius:4px;
-  font-family:'Raleway','Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;
+  font-family:'Raleway',sans-serif;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;
   cursor:pointer;transition:all 0.2s;white-space:nowrap;
 }
 @media(hover:hover){.ctrl-btn:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}}
 .ctrl-btn.on{background:#2e8b57;border-color:#2e8b57;color:#fff;}
-.ctrl-group{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:9px;color:#111;letter-spacing:0.06em;text-transform:uppercase;}
+.ctrl-group{display:flex;align-items:center;gap:5px;font-family:'Raleway',sans-serif;font-size:9px;color:#111;letter-spacing:0.06em;text-transform:uppercase;}
 .voice-sax{padding:4px 8px;}
 input[type=range]{
   -webkit-appearance:none;appearance:none;width:55px;height:2px;
@@ -105,7 +104,7 @@ input[type=range]::-webkit-slider-thumb{
 .progress-wrap{max-width:620px;margin:6px auto 0;height:3px;background:rgba(17,17,17,0.12);border-radius:2px;overflow:hidden;}
 .progress-bar{height:100%;background:#2e8b57;width:0%;}
 .legend{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px auto 0;max-width:620px;}
-.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:8px;color:var(--text-faint);letter-spacing:0.08em;text-transform:uppercase;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Raleway',sans-serif;font-size:8px;color:var(--text-faint);letter-spacing:0.08em;text-transform:uppercase;}
 .ldot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
 
 /* Footer home link */
@@ -113,7 +112,7 @@ input[type=range]::-webkit-slider-thumb{
 .home-link{
   display:inline-block;background:#fff;border:2px solid #111;color:#111;
   padding:8px 20px;border-radius:4px;
-  font-family:'Raleway','Space Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;
+  font-family:'Raleway',sans-serif;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;
   text-decoration:none;transition:all 0.2s;
 }
 @media(hover:hover){.home-link:hover{background:#2e8b57;border-color:#2e8b57;color:#fff;}}
@@ -123,7 +122,10 @@ input[type=range]::-webkit-slider-thumb{
 /* Hero */
 h1{font-family:'Observer Cover',var(--ff);font-weight:normal}
 /* Section headers */
-.eyebrow{font-family:'Observer Cover','Space Mono',monospace;font-weight:normal}
+.eyebrow{font-family:'Raleway',sans-serif;font-weight:normal}
+
+/* Colour key: Raleway all caps */
+.legend-item{font-family:'Raleway',sans-serif;text-transform:uppercase;letter-spacing:0.06em}
 </style>
 </head>
 <body>
@@ -179,7 +181,7 @@ h1{font-family:'Observer Cover',var(--ff);font-weight:normal}
       <button class="ctrl-btn voice-sax" data-i="1">S2</button>
       <button class="ctrl-btn voice-sax" data-i="2">S3</button>
       <button class="ctrl-btn voice-sax" data-i="3">S4</button>
-      <select id="voice-select" style="font-family:'Space Mono',monospace;font-size:9px;padding:4px 6px;border:2px solid #111;border-radius:4px;background:#fff;cursor:pointer;"></select>
+      <select id="voice-select" style="font-family:'Raleway',sans-serif;font-size:9px;padding:4px 6px;border:2px solid #111;border-radius:4px;background:#fff;cursor:pointer;"></select>
       <input type="range" id="voice-vol" min="0.1" max="1" step="0.05" value="1" title="Voice volume">
     </div>
     <button class="ctrl-btn" id="sync-sound" style="display:none">&#9836; Sound</button>
@@ -202,8 +204,8 @@ h1{font-family:'Observer Cover',var(--ff);font-weight:normal}
 (function(){
   const BPM=95,TPB=96,TICK_MS=(60000/BPM)/TPB,MAX_TICK=71424;
   const BEATS_PER_BAR=4,TPB_BAR=TPB*BEATS_PER_BAR;
-  const FF="'Observer Cover','Futura','Century Gothic','Trebuchet MS',sans-serif";
-  const FM="'Raleway','Space Mono','Courier New',monospace"; // every FM use on canvas is weight 700 (Space Mono Bold -> Raleway)
+  const FF="'Raleway','Futura','Century Gothic','Trebuchet MS',sans-serif";
+  const FM="'Raleway',sans-serif";
   const COL={red:'#ff6b55',yellow:'#ffd84a',green:'#4ed87a',blue:'#5ab4ff'};
   const CENT_OFFSETS={[COL.red]:0,[COL.blue]:-25,[COL.green]:25,[COL.yellow]:-50};
   const NC={};
