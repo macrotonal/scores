@@ -90,6 +90,17 @@ button{font:inherit;cursor:pointer}
 }
 .wbtn.sel{background:#fff; color:#111; border-color:#fff}
 body.drawing .sys, body.drawing #pfpage, body.drawing .sys svg{touch-action:none}
+/* Ink must be free to live in the header, the top/side margins and below the last
+   system. An <svg> clips to its viewBox by default, which sliced any stroke that
+   left its anchor system's box; overflow:visible lifts that. Systems carrying ink
+   are raised so a downward stroke is not painted under the next system. */
+.sys svg, #pfpage svg, .prpage svg{overflow:visible}
+.sys{position:relative; z-index:1}
+.sys.hasink{z-index:5}
+body.drawing, body.texting{user-select:none; -webkit-user-select:none}
+/* the paper is the ink surface: let strokes sit over the header block too */
+#paper{position:relative}
+.schead{position:relative; z-index:0}
 /* performance-mode mini toolbar */
 .pfann{
   position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:50%;
@@ -358,7 +369,8 @@ body.performing .picker{display:none !important}
   .paper{border:0; border-radius:0; padding:0; max-width:none; background:#fff !important}
   body.warm{--paper:#fff}
   .printonly{display:block}
-  .prpage{page-break-after:always; break-after:page; position:relative}
+  .prpage{page-break-after:always; break-after:page; position:relative; overflow:visible}
+  .prpage .sys, .prpage svg{overflow:visible}
   .prpage:last-child{page-break-after:auto; break-after:auto}
   .prfoot{
     position:absolute; bottom:0; left:0; right:0;
@@ -1740,64 +1752,130 @@ function smoothPath(pts){
 /* paint one system's strokes into a <g> */
 function drawAnnotations(g, L, sysIdx, SP){
   while(g.firstChild) g.removeChild(g.firstChild);
-  if(!ann.visible) return;
+  if(!ann.visible){ markInkOwners(g); return; }
   var list = state.annots[L.piece.id] || [];
   var scale = SP/7.2;                       /* ink weight tracks zoom */
-  list.forEach(function(stroke, si){
-    if(!stroke) return;                       /* defensive: never break a system */
-    /* ---- text item: anchored exactly like ink, reflows with every relayout */
-    if(stroke.txt != null){
-      var tp = pointFor(L, sysIdx, stroke.a);
-      if(!tp) return;
+  list.forEach(function(item, si){
+    if(!item) return;                       /* defensive: never break a system */
+    if(!item.a) return;                     /* un-migrated: skip until migrated */
+
+    /* RIGID PLACEMENT. The item owns ONE anchor. Everything else is a fixed
+       offset in staff-space units, so relayout can only translate and uniformly
+       scale it - never stretch or shear it. A circle stays a circle. */
+    var base = pointFor(L, sysIdx, item.a);
+    if(!base) return;                       /* wrong system, hidden staff, or multirest */
+
+    if(item.txt != null){
       var t = el('text', {
-        x:r2(tp.x), y:r2(tp.y), fill:stroke.c,
+        x:r2(base.x), y:r2(base.y), fill:item.c,
         'font-family':'Observer Text Italic, Georgia, serif', 'font-style':'italic',
-        'font-size':r2((stroke.s || 2) * SP)
+        'font-size':r2((item.s || 2) * SP)
       });
-      t.textContent = stroke.txt;
+      t.textContent = item.txt;
       t.dataset.stroke = si;
       t.dataset.text = '1';
       g.appendChild(t);
       return;
     }
-    /* map points; break the path wherever a point does not live in this system */
-    var runs = [], cur = [];
-    stroke.p.forEach(function(a){
-      var pt = pointFor(L, sysIdx, a);
-      if(pt){ cur.push({x:pt.x, y:pt.y, pr:a[4]==null?0.5:a[4]}); }
-      else if(cur.length){ runs.push(cur); cur = []; }
+    if(!item.o || item.o.length < 1) return;
+
+    var pts = item.o.map(function(o){
+      return {x: base.x + o[0]*SP, y: base.y + o[1]*SP, pr: o[2]==null?0.5:o[2]};
     });
-    if(cur.length) runs.push(cur);
-    runs.forEach(function(run){
-      if(run.length === 1) run.push({x:run[0].x+0.6, y:run[0].y, pr:run[0].pr});
-      /* quantise pressure into 3 width bands so we emit few paths */
-      var band = function(pr){ return pr < 0.34 ? 0 : (pr < 0.67 ? 1 : 2); };
-      var seg = [run[0]], b = band(run[0].pr);
-      for(var i=1;i<run.length;i++){
-        var nb = band(run[i].pr);
-        seg.push(run[i]);
-        if(nb !== b || i === run.length-1){
-          emit(seg, b);
-          seg = [run[i]]; b = nb;
-        }
-      }
-      function emit(pts, bandIdx){
-        if(pts.length < 2) return;
-        var w = stroke.w * scale * [0.78, 1.0, 1.28][bandIdx];
-        var d = smoothPath(pts);
-        var path = el('path', {d:d, fill:'none', stroke:stroke.c,
-          'stroke-width':r2(Math.max(0.35, w)), 'stroke-linecap':'round',
-          'stroke-linejoin':'round'});
-        path.dataset.stroke = si;
-        g.appendChild(path);
-      }
-    });
+    if(pts.length === 1) pts.push({x:pts[0].x+0.6, y:pts[0].y, pr:pts[0].pr});
+
+    /* quantise pressure into 3 width bands so we emit few paths */
+    function band(pr){ return pr < 0.34 ? 0 : (pr < 0.67 ? 1 : 2); }
+    function emit(seg, bandIdx){
+      if(seg.length < 2) return;
+      var w = item.w * scale * [0.78, 1.0, 1.28][bandIdx];
+      var path = el('path', {d:smoothPath(seg), fill:'none', stroke:item.c,
+        'stroke-width':r2(Math.max(0.35, w)), 'stroke-linecap':'round',
+        'stroke-linejoin':'round'});
+      path.dataset.stroke = si;
+      g.appendChild(path);
+    }
+    var seg = [pts[0]], b = band(pts[0].pr);
+    for(var k=1;k<pts.length;k++){
+      var nb = band(pts[k].pr);
+      seg.push(pts[k]);
+      if(nb !== b || k === pts.length-1){ emit(seg, b); seg = [pts[k]]; b = nb; }
+    }
   });
+  markInkOwners(g);
 }
+
+/* An anchor that is guaranteed to resolve: if the point lands on a collapsed
+   multirest (or outside the columns, e.g. header/margin ink), fall back to the
+   system's first engraved bar. */
+function anchorForInk(L, sysIdx, x, y){
+  var a = anchorAt(L, sysIdx, x, y);
+  if(!a) return null;
+  if(pointFor(L, sysIdx, a)) return a;
+  var sys = L.systems[sysIdx];
+  for(var i=0;i<sys.colX.length;i++){
+    var c = sys.colX[i];
+    if(c.count === 1){
+      var f = Math.max(0, Math.min(0.999999, (x - c.x)/c.w));
+      return [a[0], c.bar, Math.round(f*10000)/10000, a[3]];
+    }
+  }
+  return null;
+}
+
+/* Migrate v1 strokes (per-point bar anchors, which squashed on relayout) to the
+   rigid format. Resolved against the current layout so the stroke keeps the shape
+   it has on screen right now, then frozen as offsets. Runs once per item. */
+function migrateAnnots(L){
+  if(!L) return;
+  var list = state.annots[L.piece.id];
+  if(!list || !list.length) return;
+  var changed = false;
+  list.forEach(function(it){
+    if(!it || it.o || (it.txt != null && it.a && it.sp)) return;
+    if(it.txt != null){                       /* text already had a single anchor */
+      if(!it.sp){ it.sp = L.SP; changed = true; }
+      return;
+    }
+    if(!it.p || !it.p.length) return;
+    var sysIdx = -1, base = null;
+    for(var sN=0; sN<L.systems.length && sysIdx<0; sN++){
+      var b = pointFor(L, sN, it.p[0]);
+      if(b){ sysIdx = sN; base = b; }
+    }
+    if(sysIdx < 0) return;                    /* not visible now; migrate later */
+    var offs = [];
+    it.p.forEach(function(pt){
+      var q = pointFor(L, sysIdx, pt);
+      if(q) offs.push([ Math.round((q.x-base.x)/L.SP*1000)/1000,
+                        Math.round((q.y-base.y)/L.SP*1000)/1000,
+                        pt[4]==null?0.5:pt[4] ]);
+    });
+    if(offs.length){
+      it.a = it.p[0].slice(0,4);
+      it.sp = L.SP;
+      it.o = offs;
+      delete it.p;
+      changed = true;
+    }
+  });
+  if(changed) saveAnnots();
+}
+
 function refreshAnnotations(){
   document.querySelectorAll('.sys svg, #pfpage svg').forEach(function(svg){
     if(svg._annotG && svg._layout) drawAnnotations(svg._annotG, svg._layout, svg._sysIdx, svg._layout.SP);
   });
+}
+/* raise systems that carry ink so overflowing strokes are never painted under a
+   neighbouring system */
+function markInkOwners(g){
+  if(!g) return;
+  var svg = g.ownerSVGElement;
+  var host = svg && svg.parentNode;
+  if(host && host.classList && host.classList.contains) {
+    host.classList.toggle('hasink', g.childNodes.length > 0);
+  }
 }
 
 /* ==========================================================================
@@ -1850,10 +1928,11 @@ function pointFor(L, sysIdx, a){
   for(var k=0;k<cols.length;k++){
     var c = cols[k];
     if(a[1] >= c.bar && a[1] <= c.bar + c.count - 1){
-      var x = (c.count > 1)
-        ? c.x + c.w * ((a[1] - c.bar) + a[2]) / c.count
-        : c.x + c.w * a[2];
-      return {x:x, y:L.staffTops[si] + 2*SP + a[3]*SP};
+      /* Anchor bar swallowed by a collapsed multirest: hide the item (never
+         delete, never squash it into the compressed bar). It returns as soon as
+         its music is engraved again. */
+      if(c.count > 1) return null;
+      return {x: c.x + c.w * a[2], y: L.staffTops[si] + 2*SP + a[3]*SP};
     }
   }
   return null;
@@ -1919,6 +1998,7 @@ function render(){
   var cw = contentWidth();
   var L = layout(p, cw, spFor(cw));
   currentLayout = L;
+  migrateAnnots(L);
 
   /* Page identity comes from the same paginate() the print and performance
      paths use, applied to this layout with an A4-portrait page aspect. */
@@ -1980,7 +2060,9 @@ function ensureRendered(){
       node.textContent = '';
       node.classList.remove('ph');
       try{
-        node.appendChild(renderSystem(currentLayout, sys));
+        var svgNode = renderSystem(currentLayout, sys);
+        node.appendChild(svgNode);
+        if(svgNode._annotG) markInkOwners(svgNode._annotG);   /* now in the DOM */
       }catch(e){
         node._done = false;
         console.error('renderSystem failed for system', idx, e);
@@ -2005,7 +2087,9 @@ function renderAllSync(L){
     node._done = true;
     node.classList.remove('ph');
     node.textContent='';
-    node.appendChild(renderSystem(L, sys));
+    var svgNode = renderSystem(L, sys);
+    node.appendChild(svgNode);
+    if(svgNode._annotG) markInkOwners(svgNode._annotG);
   });
 }
 
@@ -2302,7 +2386,8 @@ function buildSVG(){
     '@font-face{font-family:"Observer Text";src:url(data:font/otf;base64,'+FONTS.text+') format("opentype")}'+
     '@font-face{font-family:"Observer Text Italic";font-style:italic;src:url(data:font/otf;base64,'+FONTS.italic+') format("opentype")}';
   svg.appendChild(el('defs',null,[style]));
-  svg.appendChild(el('rect',{x:0,y:0,width:W,height:Math.ceil(totalH),fill:'#ffffff'}));
+  var bg = el('rect',{x:0,y:0,width:W,height:Math.ceil(totalH),fill:'#ffffff'});
+  svg.appendChild(bg);
 
   /* header */
   var g0 = el('g',{transform:'translate('+(W/2)+',52)'});
@@ -2338,6 +2423,41 @@ function buildSVG(){
     svg.appendChild(g);
     y += sys.height;
   });
+
+  /* Ink is free to live in the header and the margins, so the export box must
+     grow to contain it - otherwise the root viewBox re-clips exactly what the
+     screen now shows. */
+  var minX = 0, minY = 0, maxX = W, maxY = Math.ceil(totalH);
+  if(ann.visible){
+    var items = state.annots[p.id] || [];
+    var yAcc = headH;
+    L.systems.forEach(function(sys){
+      items.forEach(function(it){
+        if(!it || !it.a) return;
+        var base = pointFor(L, sys.index, it.a);
+        if(!base) return;
+        var pad = (it.txt != null) ? (it.s || 2) * SP * 1.2 : Math.max(2, it.w * 2);
+        var pts = (it.txt != null) ? [[0, 0]] : (it.o || []);
+        for(var k = 0; k < pts.length; k++){
+          var px = base.x + pts[k][0] * SP;
+          var py = yAcc + sys.topPad + base.y + pts[k][1] * SP;
+          if(px - pad < minX) minX = px - pad;
+          if(px + pad > maxX) maxX = px + pad;
+          if(py - pad < minY) minY = py - pad;
+          if(py + pad > maxY) maxY = py + pad;
+        }
+      });
+      yAcc += sys.height;
+    });
+  }
+  var vbW = Math.ceil(maxX - minX), vbH = Math.ceil(maxY - minY);
+  svg.setAttribute('viewBox', r2(minX) + ' ' + r2(minY) + ' ' + vbW + ' ' + vbH);
+  svg.setAttribute('width', vbW);
+  svg.setAttribute('height', vbH);
+  bg.setAttribute('x', r2(minX));
+  bg.setAttribute('y', r2(minY));
+  bg.setAttribute('width', vbW);
+  bg.setAttribute('height', vbH);
 
   return '<?xml version="1.0" encoding="UTF-8"?>\n' +
          new XMLSerializer().serializeToString(svg);
@@ -2596,6 +2716,7 @@ function repaginatePerform(){
     if(!L.systems.length || tallest * 2 <= innerH - headH || t === TRIES.length - 1) break;
   }
   perf.L = L;
+  migrateAnnots(L);
   perf.pages = paginate(L, innerH, headH);
   if(perf.page >= perf.pages.length) perf.page = Math.max(0, perf.pages.length-1);
   drawPerformPage();
@@ -2721,7 +2842,7 @@ document.addEventListener('fullscreenchange', function(){
    fingers keep scrolling and swiping pages.
    ========================================================================== */
 (function annotationInput(){
-  var drawing = null, curSvg = null, curPointer = null, rafPending = false, textDrag = null;
+  var drawing = null, curSvg = null, curPointer = null, rafPending = false, textDrag = null, drawBase = null;
 
   function svgXY(svg, ev){
     var pt = svg.createSVGPoint();
@@ -2736,6 +2857,32 @@ document.addEventListener('fullscreenchange', function(){
     var el0 = document.elementFromPoint(ev.clientX, ev.clientY);
     while(el0 && el0.tagName !== 'svg') el0 = el0.parentNode;
     return (el0 && el0._layout) ? el0 : null;
+  }
+  /* Ink target for draw/text: the system under the pointer, or - when the pointer
+     is in the header, a margin or the gap between systems - the nearest system.
+     svgXY() is a plain affine inverse, so points outside a system's box map to
+     signed local coordinates (negative y above system 1 reaches into the header). */
+  function inkTargetSvg(ev){
+    var direct = svgUnder(ev);
+    if(direct) return direct;
+    var list = document.querySelectorAll(perf.on ? '#pfpage svg' : '.sys svg');
+    var best = null, bd = Infinity;
+    for(var i=0;i<list.length;i++){
+      var s = list[i];
+      if(!s._layout) continue;
+      var r = s.getBoundingClientRect();
+      var dy = ev.clientY < r.top ? r.top - ev.clientY : (ev.clientY > r.bottom ? ev.clientY - r.bottom : 0);
+      var dx = ev.clientX < r.left ? r.left - ev.clientX : (ev.clientX > r.right ? ev.clientX - r.right : 0);
+      var d = dx*dx + dy*dy;
+      if(d < bd){ bd = d; best = s; }
+    }
+    return best;
+  }
+  /* only the score paper is an ink surface - never the chrome */
+  function onPaper(ev){
+    var t = ev.target;
+    if(!t || !t.closest) return false;
+    return !!(t.closest('#paper') || t.closest('#pfpage') || t.closest('#perform'));
   }
 
   function down(ev){
@@ -2758,7 +2905,8 @@ document.addEventListener('fullscreenchange', function(){
     /* ---- TEXT: tap empty space to place, tap an item to edit, drag to move */
     if(ann.mode === 'text'){
       if(ev.pointerType === 'touch') return;
-      var tsvg = svgUnder(ev);
+      if(!onPaper(ev)) return;
+      var tsvg = inkTargetSvg(ev);
       if(!tsvg) return;
       var hit = document.elementFromPoint(ev.clientX, ev.clientY);
       if(hit && hit.dataset && hit.dataset.text === '1'){
@@ -2769,23 +2917,29 @@ document.addEventListener('fullscreenchange', function(){
       }
       var xy2 = svgXY(tsvg, ev);
       if(!xy2) return;
-      var a2 = anchorAt(tsvg._layout, tsvg._sysIdx, xy2.x, xy2.y);
+      var a2 = anchorForInk(tsvg._layout, tsvg._sysIdx, xy2.x, xy2.y);
       if(a2) openTextEditor(tsvg, a2, null);
       ev.preventDefault();
       return;
     }
     if(!ann.on) return;
     if(ev.pointerType === 'touch') return;            /* fingers never draw */
-    var svg = svgUnder(ev);
+    if(!onPaper(ev)) return;
+    var svg = inkTargetSvg(ev);
     if(!svg) return;
     ev.preventDefault();
     var xy = svgXY(svg, ev);
     if(!xy) return;
     if(ann.erasing){ eraseAt(svg, xy); return; }
-    var a = anchorAt(svg._layout, svg._sysIdx, xy.x, xy.y);
+    var a = anchorForInk(svg._layout, svg._sysIdx, xy.x, xy.y);
     if(!a) return;
-    a.push(ev.pressure || 0.5);
-    drawing = {c:ann.colour, w:ann.width, p:[a]};
+    var base = pointFor(svg._layout, svg._sysIdx, a);
+    if(!base) return;
+    /* one anchor for the whole stroke; every later sample is a rigid offset
+       measured in staff spaces, so replay can only translate + uniformly scale */
+    drawing = {c:ann.colour, w:ann.width, a:a, sp:svg._layout.SP,
+               o:[[0, 0, ev.pressure || 0.5]]};
+    drawBase = base;
     curSvg = svg;
     /* capture on the SVG itself: a stable element for the whole stroke, so the
        pointer is never lost mid-draw (the "sticky" start/stop feel) */
@@ -2798,7 +2952,7 @@ document.addEventListener('fullscreenchange', function(){
       if(textDrag.moved){
         var dxy = svgXY(textDrag.svg, ev);
         if(dxy){
-          var na = anchorAt(textDrag.svg._layout, textDrag.svg._sysIdx, dxy.x, dxy.y);
+          var na = anchorForInk(textDrag.svg._layout, textDrag.svg._sysIdx, dxy.x, dxy.y);
           var lst = state.annots[textDrag.svg._layout.piece.id] || [];
           if(na && lst[textDrag.index]){ lst[textDrag.index].a = na; refreshAnnotations(); }
         }
@@ -2823,13 +2977,13 @@ document.addEventListener('fullscreenchange', function(){
       var sev = samples[i];
       var xy = svgXY(curSvg, sev);
       if(!xy) continue;
-      var a = anchorAt(curSvg._layout, curSvg._sysIdx, xy.x, xy.y);
-      if(!a) continue;
-      a.push(sev.pressure || ev.pressure || 0.5);
-      var last = drawing.p[drawing.p.length-1];
+      var SPn = curSvg._layout.SP;
+      var dx = Math.round((xy.x - drawBase.x)/SPn*1000)/1000;
+      var dy = Math.round((xy.y - drawBase.y)/SPn*1000)/1000;
+      var last = drawing.o[drawing.o.length-1];
       /* drop exact duplicates only; never thin the stream */
-      if(last && last[1]===a[1] && last[2]===a[2] && last[3]===a[3]) continue;
-      drawing.p.push(a);
+      if(last && last[0]===dx && last[1]===dy) continue;
+      drawing.o.push([dx, dy, sev.pressure || ev.pressure || 0.5]);
     }
     if(!rafPending){
       rafPending = true;
@@ -2848,8 +3002,8 @@ document.addEventListener('fullscreenchange', function(){
     }
     curPointer = null;
     if(!drawing) return;
-    if(drawing.p.length > 1) annPush(drawing);
-    drawing = null; curSvg = null;
+    if(drawing.o && drawing.o.length > 1) annPush(drawing);
+    drawing = null; curSvg = null; drawBase = null;
     refreshAnnotations();
   }
   function livePreview(){
@@ -2857,10 +3011,8 @@ document.addEventListener('fullscreenchange', function(){
     var L = curSvg._layout, g = curSvg._annotG;
     var tmp = g.querySelector('.live');
     if(!tmp){ tmp = el('path',{'class':'live', fill:'none','stroke-linecap':'round','stroke-linejoin':'round'}); g.appendChild(tmp); }
-    var pts = [];
-    drawing.p.forEach(function(a){
-      var pt = pointFor(L, curSvg._sysIdx, a);
-      if(pt) pts.push(pt);
+    var pts = drawing.o.map(function(off){
+      return {x: drawBase.x + off[0]*L.SP, y: drawBase.y + off[1]*L.SP};
     });
     tmp.setAttribute('d', smoothPath(pts));
     tmp.setAttribute('stroke', drawing.c);
@@ -2877,15 +3029,13 @@ document.addEventListener('fullscreenchange', function(){
         }
         continue;
       }
-      var pts = [];
-      list[i].p.forEach(function(a){
-        var pt = pointFor(L, svg._sysIdx, a);
-        if(pt) pts.push(pt);
-      });
-      for(var k=0;k<pts.length;k++){
-        if(Math.abs(pts[k].x-xy.x) < tol && Math.abs(pts[k].y-xy.y) < tol){
-          annErase(i); return;
-        }
+      var it = list[i];
+      if(!it.a || !it.o) continue;
+      var b = pointFor(L, svg._sysIdx, it.a);
+      if(!b) continue;
+      for(var k=0;k<it.o.length;k++){
+        var px = b.x + it.o[k][0]*L.SP, py = b.y + it.o[k][1]*L.SP;
+        if(Math.abs(px-xy.x) < tol && Math.abs(py-xy.y) < tol){ annErase(i); return; }
       }
     }
   }
@@ -2973,7 +3123,8 @@ function commitTextEditor(){
       saveAnnots();
     }
   } else if(txt){
-    annPush({c:ann.colour, s:ann.textSize, a:textEdit.anchor, txt:txt});
+    annPush({c:ann.colour, s:ann.textSize, a:textEdit.anchor,
+             sp:textEdit.svg._layout.SP, txt:txt});
   }
   closeTextEditor();
   refreshAnnotations();
