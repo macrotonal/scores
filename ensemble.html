@@ -13,6 +13,7 @@
 :root{
   --bg:#014b4a; --text:#d4e8d8; --accent:#2e8b57; --head:#e8f5ec;
   --ink:#111; --paper:#fff;
+  --sbw:270px;                 /* sidebar width; user-resizable, persisted */
 }
 /* WARM: takes the blue edge off the white paper. Screen only. */
 body.warm{
@@ -125,10 +126,23 @@ body.drawing, body.texting{user-select:none; -webkit-user-select:none}
 /* ---------------------------------------------------------------- shell */
 .shell{display:flex; align-items:stretch; min-height:calc(100vh - var(--bar-h))}
 .sidebar{
-  width:270px; flex:0 0 270px; padding:14px 12px 60px;
+  position:relative;
+  width:var(--sbw); flex:0 0 var(--sbw); padding:14px 12px 60px;
   border-right:1px solid rgba(212,232,216,0.18);
   overflow-y:auto; max-height:calc(100vh - var(--bar-h)); position:sticky; top:var(--bar-h);
 }
+/* drag handle on the sidebar's right edge (mouse + touch) */
+.sb-resize{
+  position:absolute; top:0; right:-3px; width:12px; height:100%;
+  cursor:col-resize; touch-action:none; z-index:70;
+  background:transparent;
+}
+.sb-resize::after{
+  content:''; position:absolute; top:0; bottom:0; left:5px; width:2px;
+  background:rgba(212,232,216,0.18); transition:background .15s;
+}
+.sb-resize:hover::after, body.sbdrag .sb-resize::after{background:var(--accent)}
+body.sbdrag{cursor:col-resize; user-select:none; -webkit-user-select:none}
 body.nosidebar .sidebar{display:none}
 .scorewrap{flex:1 1 auto; min-width:0; padding:18px 16px 120px}
 
@@ -144,13 +158,21 @@ body.nosidebar .sidebar{display:none}
   flex:1 1 auto; font-family:'Observer Text Italic','Georgia',serif; font-style:italic;
   font-size:15px; letter-spacing:.01em; color:var(--head);
 }
-.prow{display:flex; align-items:center; gap:8px; padding:5px 10px}
+.prow{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:5px 10px}
+/* Controls travel together, so they wrap BELOW the name rather than squeezing it. */
+.prow-ctrls, .grp-ctrls{
+  display:flex; align-items:center; gap:6px; flex:0 0 auto; margin-left:auto;
+}
 .prow:nth-child(even){background:rgba(255,255,255,0.03)}
 .pname{
   /* abbreviated shortName, never truncated: the distinguishing number must stay
      visible, so long names wrap to a second line instead of ellipsizing */
-  flex:1 1 auto; min-width:0; font-family:'Raleway',sans-serif; font-size:11.5px;
-  color:var(--text); line-height:1.25; overflow-wrap:break-word; hyphens:auto;
+  /* min-width stops flexbox crushing the name to one character per line (the harp
+     rows carry the most controls and hit this first); normal word breaking means
+     text can never render vertically at any sidebar width. */
+  flex:1 1 5.5em; min-width:5em; font-family:'Raleway',sans-serif; font-size:11.5px;
+  color:var(--text); line-height:1.25;
+  overflow-wrap:normal; word-break:normal; hyphens:none; white-space:normal;
 }
 /* lane colour swatch + picker */
 .pdot{
@@ -302,29 +324,77 @@ body.earing .sys svg, body.earing #pfpage svg{cursor:pointer}
 }
 .toast.show{opacity:1}
 
-/* ---------------------------------------------------------------- iPad / narrow */
-@media (max-width:1000px){
-  .sidebar{
-    position:fixed; top:0; left:0; bottom:0; z-index:60; width:300px; flex-basis:300px;
-    max-height:100vh; background:var(--bg); border-right:2px solid rgba(212,232,216,0.3);
-    transform:translateX(-105%); transition:transform .24s ease;
-    box-shadow:0 0 40px rgba(0,0,0,.5); padding-top:18px;
-  }
-  /* On narrow viewports the sidebar is a drawer: only .drawer reveals it.
-     .nosidebar keeps hiding it (base rule) so it can never be forced open. */
-  body.drawer .sidebar{transform:translateX(0)}
-  body:not(.nosidebar) .sidebar{display:block}
-  .scrim{
-    position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:50; opacity:0;
-    pointer-events:none; transition:opacity .24s;
-  }
-  body.drawer .scrim{opacity:1; pointer-events:auto}
-  .scorewrap{padding:14px 10px 120px}
-  .paper{padding:20px 14px 26px}
-  .sc-title{font-size:28px}
-}
+/* ------------------------------------------------- device modes (Auto/Phone/Tablet/Desktop)
+   Layout is driven by body[data-dev], not by viewport width alone, so the user's
+   override is authoritative. Auto sets the attribute from the viewport. */
 .scrim{display:none}
-@media (max-width:1000px){.scrim{display:block}}
+
+/* ---- TABLET and PHONE share the overlay-sidebar behaviour ---- */
+body[data-dev="tablet"] .sidebar,
+body[data-dev="phone"] .sidebar{
+  position:fixed; top:0; left:0; bottom:0; z-index:60; width:300px; flex-basis:300px;
+  max-height:100vh; background:var(--bg); border-right:2px solid rgba(212,232,216,0.3);
+  transform:translateX(-105%); transition:transform .24s ease;
+  box-shadow:0 0 40px rgba(0,0,0,.5); padding-top:18px;
+}
+body[data-dev="tablet"].drawer .sidebar,
+body[data-dev="phone"].drawer .sidebar{transform:translateX(0)}
+body[data-dev="tablet"]:not(.nosidebar) .sidebar,
+body[data-dev="phone"]:not(.nosidebar) .sidebar{display:block}
+body[data-dev="tablet"] .scrim,
+body[data-dev="phone"] .scrim{
+  display:block; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:50;
+  opacity:0; pointer-events:none; transition:opacity .24s;
+}
+body[data-dev="tablet"].drawer .scrim,
+body[data-dev="phone"].drawer .scrim{opacity:1; pointer-events:auto}
+body[data-dev="tablet"] .scorewrap,
+body[data-dev="phone"] .scorewrap{padding:14px 10px 120px}
+body[data-dev="tablet"] .paper,
+body[data-dev="phone"] .paper{padding:20px 14px 26px}
+body[data-dev="tablet"] .sc-title,
+body[data-dev="phone"] .sc-title{font-size:28px}
+/* the drag handle is meaningless for an overlay sidebar */
+body[data-dev="tablet"] .sb-resize,
+body[data-dev="phone"] .sb-resize{display:none}
+
+/* ---- PHONE: compact, must not be broken ---- */
+body[data-dev="phone"]{overflow-x:hidden}
+body[data-dev="phone"] .topbar{
+  gap:6px; padding:6px 8px; min-height:0; flex-wrap:nowrap; align-items:center;
+}
+/* one row: piece tabs scroll, everything else folds into the menu */
+body[data-dev="phone"] .tabs{
+  flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden;
+  flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+body[data-dev="phone"] .tabs::-webkit-scrollbar{display:none}
+body[data-dev="phone"] .tab{flex:0 0 auto; padding:0 10px; font-size:8.5px}
+body[data-dev="phone"] .tb-spacer{display:none}
+body[data-dev="phone"] .zoom{display:none}
+body[data-dev="phone"] .tb-group.fold{
+  display:none; position:fixed; top:52px; right:6px; left:6px; z-index:120;
+  background:var(--bg); border:2px solid rgba(212,232,216,.35); border-radius:8px;
+  padding:8px; gap:6px; flex-wrap:wrap; box-shadow:0 12px 40px rgba(0,0,0,.5);
+}
+body[data-dev="phone"].menu .tb-group.fold{display:flex}
+body[data-dev="phone"] .tb-group.fold .btn{flex:1 1 44%}
+body[data-dev="phone"] #btnPerform{order:-2; flex:1 1 100%}
+body[data-dev="phone"] .phone-only{display:inline-flex}
+body[data-dev="phone"] .anntools{padding:6px 2px 2px}
+/* score surface: fit the width, never scroll sideways */
+body[data-dev="phone"] .scorewrap{padding:8px 4px 90px; min-width:0}
+body[data-dev="phone"] .paper{padding:12px 6px 18px; border-radius:4px; max-width:100%}
+body[data-dev="phone"] .sc-title{font-size:22px}
+body[data-dev="phone"] .sc-sub{font-size:14px}
+body[data-dev="phone"] .sc-comp,body[data-dev="phone"] .sc-meta{font-size:10px}
+body[data-dev="phone"] .sys svg{max-width:100%}
+body[data-dev="phone"] .sidebar{width:100vw; flex-basis:100vw; border-right:0}
+body[data-dev="phone"] .pagehint{right:8px; bottom:8px; font-size:11px}
+.phone-only{display:none}
+/* the fold menu is desktop/tablet-irrelevant: buttons stay inline there */
+body[data-dev="desktop"] .tb-group.fold,
+body[data-dev="tablet"] .tb-group.fold{display:flex}
 
 /* ---------------------------------------------------------------- perform */
 #perform{
@@ -391,7 +461,8 @@ body.performing .picker{display:none !important}
     <span class="val" id="zoomVal">100%</span>
     <button class="btn ghost icon" id="zoomIn" aria-label="Zoom in">+</button>
   </div>
-  <div class="tb-group">
+  <button class="btn ghost icon phone-only" id="btnMenu" aria-label="More controls">&#8943;</button>
+  <div class="tb-group fold" id="tbfold">
     <button class="btn" id="btnPrint">Print / PDF</button>
     <button class="btn" id="btnSvg">SVG</button>
     <button class="btn" id="btnXml">MusicXML</button>
@@ -402,6 +473,7 @@ body.performing .picker{display:none !important}
     <button class="btn ghost" id="btnTuner">Tuner</button>
     <button class="btn perform" id="btnPerform">Perform</button>
     <button class="btn ghost icon" id="btnSidebar" aria-label="Toggle parts panel">&#9776;</button>
+    <button class="btn ghost" id="btnDevice" title="Layout mode">Auto</button>
   </div>
   <div class="anntools" id="anntools" style="display:none"></div>
 </div>
@@ -554,6 +626,8 @@ var state = {
   annots: {},       /* pieceId -> [stroke] in musical coordinates */
   zoom: 100,        /* percent; 100 = fit width */
   warm: false,      /* warm paper tint (screen only) */
+  sidebarW: 270,    /* resizable sidebar width, persisted */
+  device: 'auto',   /* auto | phone | tablet | desktop */
   sp: 7.2
 };
 
@@ -2099,6 +2173,7 @@ function renderAllSync(L){
 function buildSidebar(){
   var p = piece(), sb = document.getElementById('sidebar');
   sb.textContent='';
+  initSidebarResize();          /* textContent='' removes the drag handle */
   sb.appendChild(h('div','sb-note',
     'Off · Score · Guide. Score engraves the part. Guide shows a slim activity lane ' +
     'under each system. The dot sets that lane colour. Harp parts offer a B/W option.'));
@@ -2108,19 +2183,24 @@ function buildSidebar(){
     var head = h('div','grp-head');
     head.appendChild(swatch(p, g.parts, true));
     head.appendChild(h('span','grp-name', g.name));
+    var gctrl = h('div','grp-ctrls');
     if(g.parts.every(function(pi){ return isHarp(p, pi); })){
-      head.appendChild(bwToggle(p, g.parts));
+      gctrl.appendChild(bwToggle(p, g.parts));
     }
-    head.appendChild(triControl(function(){ return groupState(p, g); },
+    gctrl.appendChild(triControl(function(){ return groupState(p, g); },
       function(v){ g.parts.forEach(function(pi){ selOf(p)[pi] = v; }); commit(); }));
+    head.appendChild(gctrl);
     box.appendChild(head);
     g.parts.forEach(function(pi){
       var row = h('div','prow');
       row.appendChild(swatch(p, [pi], false));
       row.appendChild(h('span','pname', staffLabel(p.parts[pi])));
-      if(isHarp(p, pi)) row.appendChild(bwToggle(p, [pi]));
-      row.appendChild(triControl(function(){ return selOf(p)[pi]||0; },
+      /* B/W + tri-state wrap together onto a second line before the name shrinks */
+      var ctrl = h('div','prow-ctrls');
+      if(isHarp(p, pi)) ctrl.appendChild(bwToggle(p, [pi]));
+      ctrl.appendChild(triControl(function(){ return selOf(p)[pi]||0; },
         function(v){ selOf(p)[pi]=v; commit(); }));
+      row.appendChild(ctrl);
       box.appendChild(row);
     });
     sb.appendChild(box);
@@ -2328,6 +2408,10 @@ function loadLocal(){
       state.zoom = near;
     }
     state.warm = localStorage.getItem('ensembleWarm') === '1';
+    var sbw = parseInt(localStorage.getItem('ensembleSidebarW'), 10);
+    if(!isNaN(sbw)) state.sidebarW = sbw;
+    var dev = localStorage.getItem('ensembleDevice');
+    if(dev && DEVICE_MODES.indexOf(dev) >= 0) state.device = dev;
     var pid = localStorage.getItem('ensemblePiece');
     if(pid){
       var i = D.pieces.findIndex(function(p){ return p.id===pid; });
@@ -3192,6 +3276,107 @@ function buildTabs(){
     t.appendChild(b);
   });
 }
+/* ---------------------------------------------------------------- device mode */
+var DEVICE_MODES = ['auto', 'phone', 'tablet', 'desktop'];
+var DEVICE_LABEL = {auto:'Auto', phone:'Phone', tablet:'Tablet', desktop:'Desktop'};
+/* Auto picks by viewport; an explicit choice always wins. */
+function autoDevice(){
+  /* innerWidth alone is unreliable: a mobile browser can report an expanded
+     layout viewport before the page settles, which would hide phone mode on the
+     device that needs it most. Take the smaller of the layout and hardware
+     widths, and treat a coarse pointer as at least tablet. */
+  var w = window.innerWidth || 1200;
+  var sw = (window.screen && window.screen.width) ? window.screen.width : w;
+  var eff = Math.min(w, sw);
+  var coarse = !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+  if(eff < 700) return 'phone';
+  if(eff < 1100 || coarse) return 'tablet';
+  return 'desktop';
+}
+function effectiveDevice(){
+  return state.device === 'auto' ? autoDevice() : state.device;
+}
+function applyDevice(rerender){
+  var eff = effectiveDevice();
+  var prev = document.body.getAttribute('data-dev');
+  document.body.setAttribute('data-dev', eff);
+  var b = document.getElementById('btnDevice');
+  if(b) b.textContent = state.device === 'auto'
+    ? ('Auto \u00b7 ' + DEVICE_LABEL[eff]) : DEVICE_LABEL[state.device];
+  if(eff !== 'phone') document.body.classList.remove('menu');
+  if(eff !== prev){
+    /* leaving/entering an overlay-sidebar mode changes the score width */
+    document.body.classList.remove('drawer');
+    if(rerender !== false){ render(); if(perf.on) repaginatePerform(); }
+  }
+  return eff;
+}
+function cycleDevice(){
+  var i = DEVICE_MODES.indexOf(state.device);
+  state.device = DEVICE_MODES[(i + 1) % DEVICE_MODES.length];
+  try{ localStorage.setItem('ensembleDevice', state.device); }catch(e){}
+  applyDevice(true);
+}
+/* the overlay-sidebar modes, used wherever the old width media query was */
+function isNarrowMode(){
+  var d = effectiveDevice();
+  return d === 'tablet' || d === 'phone';
+}
+
+/* ---------------------------------------------------------------- sidebar resize */
+var SB_MIN = 240;
+function sbMax(){ return Math.round(window.innerWidth * 0.5); }
+function setSidebarWidth(px, persist){
+  var w = Math.max(SB_MIN, Math.min(sbMax(), Math.round(px)));
+  state.sidebarW = w;
+  document.documentElement.style.setProperty('--sbw', w + 'px');
+  if(persist){ try{ localStorage.setItem('ensembleSidebarW', String(w)); }catch(e){} }
+  return w;
+}
+function initSidebarResize(){
+  var sb = document.getElementById('sidebar');
+  if(!sb || sb.querySelector('.sb-resize')) return;
+  var handle = h('div','sb-resize');
+  handle.setAttribute('aria-label','Resize parts panel');
+  sb.appendChild(handle);
+  var dragging = false, pending = false;
+  function apply(clientX){
+    var left = sb.getBoundingClientRect().left;
+    setSidebarWidth(clientX - left, false);
+    /* fit-width (100% zoom) is derived from the score area, so relayout live */
+    if(!pending){
+      pending = true;
+      requestAnimationFrame(function(){ pending = false; render(); });
+    }
+  }
+  handle.addEventListener('pointerdown', function(e){
+    if(isNarrowMode()) return;                       /* overlay sidebar: no resize */
+    dragging = true;
+    document.body.classList.add('sbdrag');
+    try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    apply(e.clientX);
+    e.preventDefault();
+  });
+  function end(e){
+    if(!dragging) return;
+    dragging = false;
+    document.body.classList.remove('sbdrag');
+    try{ handle.releasePointerCapture(e.pointerId); }catch(err){}
+    setSidebarWidth(state.sidebarW, true);   /* persist the settled width */
+    render();
+  }
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  /* keep the width legal when the window changes */
+  window.addEventListener('resize', function(){
+    if(state.sidebarW) setSidebarWidth(state.sidebarW, false);
+  });
+}
+
 function setWarm(on){
   state.warm = !!on;
   document.body.classList.toggle('warm', state.warm);
@@ -3259,7 +3444,12 @@ function boot(){
   buildSidebar();
   buildAnnToolbars();
   setWarm(state.warm);
+  setSidebarWidth(state.sidebarW, false);
+  applyDevice(false);
+  initSidebarResize();
   loadTuner();
+  /* a mobile browser may correct its viewport just after load */
+  setTimeout(function(){ if(state.device === 'auto') applyDevice(true); }, 350);
   document.getElementById('zoomVal').textContent = state.zoom+'%';
   render();
 
@@ -3271,6 +3461,16 @@ function boot(){
   document.getElementById('btnPerform').addEventListener('click', enterPerform);
   document.getElementById('pfexit').addEventListener('click', exitPerform);
   document.getElementById('btnWarm').addEventListener('click', function(){ setWarm(!state.warm); });
+  document.getElementById('btnDevice').addEventListener('click', cycleDevice);
+  document.getElementById('btnMenu').addEventListener('click', function(e){
+    e.stopPropagation();
+    document.body.classList.toggle('menu');
+  });
+  document.addEventListener('click', function(e){
+    if(!document.body.classList.contains('menu')) return;
+    if(e.target.closest('#tbfold') || e.target.closest('#btnMenu')) return;
+    document.body.classList.remove('menu');
+  });
   document.getElementById('btnDraw').addEventListener('click', function(){ setMode('draw'); });
   document.getElementById('btnText').addEventListener('click', function(){ setMode('text'); });
   document.getElementById('btnEar').addEventListener('click', function(){ earAC(); setMode('ear'); });
@@ -3309,7 +3509,7 @@ function boot(){
     document.getElementById('pfdraw').className = 'pfdraw' + (ann.on ? ' on' : '');
   });
   document.getElementById('btnSidebar').addEventListener('click', function(){
-    if(window.matchMedia('(max-width:1000px)').matches){
+    if(isNarrowMode()){
       document.body.classList.toggle('drawer');
     } else {
       document.body.classList.toggle('nosidebar');
@@ -3327,6 +3527,7 @@ function boot(){
   window.addEventListener('resize', function(){
     clearTimeout(rt);
     rt = setTimeout(function(){
+      if(state.device === 'auto') applyDevice(false);
       if(perf.on) repaginatePerform(); else render();
     }, 180);
   });
@@ -3352,6 +3553,10 @@ function boot(){
     perf: perf,
     ann: ann, annots: function(){ return state.annots; },
     setDrawMode: setDrawMode, setMode: setMode, annUndo: annUndo, annRedo: annRedo,
+    setSidebarWidth: setSidebarWidth,
+    cycleDevice: cycleDevice, applyDevice: applyDevice,
+    effectiveDevice: effectiveDevice,
+    setDevice: function(d){ state.device=d; try{localStorage.setItem('ensembleDevice',d);}catch(e){} return applyDevice(true); },
     earFreq: earFreq, earPlay: earPlay, toggleTuner: toggleTuner, tuner: tuner,
     soundingMidi: soundingMidi,
     anchorAt: anchorAt, pointFor: pointFor,
