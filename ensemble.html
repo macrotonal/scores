@@ -358,6 +358,41 @@ body[data-dev="phone"] .sc-title{font-size:28px}
 body[data-dev="tablet"] .sb-resize,
 body[data-dev="phone"] .sb-resize{display:none}
 
+/* Sheet header. The overlay sidebar covers the toolbar - including the very
+   button that opened it - and on phone it is 100vw wide, so the scrim behind it
+   cannot be tapped either. #tbfold cannot rescue it: .topbar is a stacking
+   context (position:sticky, z-index:40), so the fold menu's z-index:120 is
+   scoped INSIDE z-40 and still paints under the z-60 sheet. The sheet therefore
+   carries its own exit, sticky at the top, always thumb-reachable. */
+.sb-head{display:none}
+body[data-dev="tablet"] .sb-head,
+body[data-dev="phone"] .sb-head{
+  display:flex; align-items:center; gap:10px;
+  position:sticky; top:0; z-index:3;
+  margin:0 -12px 12px; padding:8px 12px 6px;
+  background:var(--bg); border-bottom:1px solid rgba(212,232,216,0.22);
+  touch-action:none;
+}
+/* the sticky header supplies the sheet's top spacing, so drop the drawer padding
+   that would otherwise offset it and let the note slide under it */
+body[data-dev="tablet"].drawer .sidebar,
+body[data-dev="phone"].drawer .sidebar{padding-top:0}
+.sb-head .sb-title{
+  flex:1 1 auto; font-family:'Observer Text Italic','Georgia',serif; font-style:italic;
+  font-size:15px; color:var(--head);
+}
+.sb-done{
+  flex:0 0 auto; min-width:44px; min-height:44px; padding:0 14px; border-radius:4px;
+  background:#fff; border:2px solid #fff; color:var(--ink);
+  font-family:'Raleway',sans-serif; font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+}
+/* grab bar: the affordance for swipe-down-to-dismiss */
+.sb-grab{
+  position:absolute; left:50%; top:2px; transform:translateX(-50%);
+  width:38px; height:4px; border-radius:2px; background:rgba(212,232,216,0.35);
+}
+
 /* ---- PHONE: compact, must not be broken ---- */
 body[data-dev="phone"]{overflow-x:hidden}
 body[data-dev="phone"] .topbar{
@@ -396,6 +431,46 @@ body[data-dev="phone"] .pagehint{right:8px; bottom:8px; font-size:11px}
 body[data-dev="desktop"] .tb-group.fold,
 body[data-dev="tablet"] .tb-group.fold{display:flex}
 
+/* ---- PHONE mode bar (DRAW / TEXT / EAR) ----
+   The shared .anntools strip wraps inside the top bar, which on a phone squashed
+   the piece tabs into a tall moosh and buried the DRAW toggle, leaving no exit.
+   On phone each mode instead replaces the chrome with this compact bottom bar:
+   one non-wrapping scrollable row of that mode's tools plus a fixed EXIT at the
+   end. Bottom = thumb-reachable, and it leaves the top of the page readable. */
+.modebar{display:none}
+body[data-dev="phone"] .anntools{display:none !important}   /* never wrap into the tabs */
+body[data-dev="phone"].modeon .modebar{
+  display:flex; align-items:center; gap:6px;
+  position:fixed; left:0; right:0; bottom:0; z-index:130;
+  padding:6px 8px; padding-bottom:calc(6px + env(safe-area-inset-bottom));
+  background:var(--bg); border-top:2px solid rgba(212,232,216,0.35);
+  box-shadow:0 -10px 30px rgba(0,0,0,.45);
+}
+/* the main toolbar steps aside while a mode is active; the shell takes over its
+   height so nothing on the page shifts when a mode is entered or left */
+body[data-dev="phone"].modeon .topbar{display:none}
+body[data-dev="phone"].modeon .shell{padding-top:var(--modepad, var(--bar-h))}
+body.performing .modebar{display:none !important}
+.mb-tools{
+  flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:6px;
+  flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
+  -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+.mb-tools::-webkit-scrollbar{display:none}
+.mb-label{
+  flex:0 0 auto; padding-right:2px;
+  font-family:'Observer Text Italic','Georgia',serif; font-style:italic;
+  font-size:12px; color:rgba(212,232,216,0.75); white-space:nowrap;
+}
+.mb-exit{
+  flex:0 0 auto; min-width:74px; min-height:44px; padding:0 14px; border-radius:4px;
+  background:var(--accent); border:2px solid var(--accent); color:#fff;
+  font-family:'Raleway',sans-serif; font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+}
+/* touch targets on a phone: the tuner's ✕ was 32px and could sit off-screen */
+body[data-dev="phone"] .tp-x{width:44px; height:44px}
+
 /* ---------------------------------------------------------------- perform */
 #perform{
   position:fixed; inset:0; z-index:500; background:var(--paper); display:none;
@@ -419,6 +494,11 @@ body.performing .picker{display:none !important}
   font-size:17px; line-height:1; opacity:.28; transition:opacity .25s;
 }
 #perform .pfexit:hover,#perform .pfexit:focus{opacity:1}
+/* A touch screen has no hover, so a control resting at 0.28 opacity is close to
+   invisible and reads as "no way out". Keep the fading controls findable there. */
+@media (pointer:coarse){
+  #perform .pfexit, .pfdraw{opacity:.62}
+}
 #perform .pfind{
   position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:50%;
   transform:translateX(-50%); z-index:520;
@@ -495,6 +575,11 @@ body.performing .picker{display:none !important}
   <div class="pfind" id="pfind"></div>
   <div class="pfann" id="pfann" style="display:none"></div>
   <button class="pfdraw" id="pfdraw" aria-label="Toggle drawing">&#9998;</button>
+</div>
+
+<div class="modebar" id="modebar">
+  <div class="mb-tools" id="mbtools"></div>
+  <button class="mb-exit" id="mbexit">Done</button>
 </div>
 
 <input id="annedit" class="annedit" type="text" autocomplete="off" spellcheck="false"
@@ -2058,19 +2143,59 @@ function renderHeader(p){
   head.setAttribute('data-piece', p.title);
 }
 
+/* Keep the reader where they were across a rebuild.
+   render() replaces the whole #sysbox subtree. Any forced layout taken while that
+   subtree is empty collapses the document height, and the browser then CLAMPS the
+   scroll position to the top - measured: scrollY 9000 -> 5. Chrome's scroll
+   anchoring usually put it back, mobile Safari did not, which is why pages
+   "jumped back to 1" mid-scroll. Two defences: never measure while empty (see
+   render below), and explicitly re-anchor afterwards. */
+function captureScrollAnchor(){
+  if(document.body.classList.contains('performing')) return null;
+  var box = document.getElementById('sysbox');
+  if(!box) return null;
+  var nodes = box.querySelectorAll('.sys');
+  for(var i=0;i<nodes.length;i++){
+    var r = nodes[i].getBoundingClientRect();
+    if(r.bottom > 0) return {sys:+nodes[i].dataset.sys, top:r.top};
+  }
+  return null;
+}
+function restoreScrollAnchor(k){
+  if(!k || document.body.classList.contains('performing')) return;
+  var node = document.querySelector('#sysbox .sys[data-sys="'+k.sys+'"]');
+  if(!node){
+    var all = document.querySelectorAll('#sysbox .sys');
+    if(!all.length) return;
+    node = all[Math.min(k.sys, all.length-1)];   /* selection shrank: nearest system */
+  }
+  var delta = node.getBoundingClientRect().top - k.top;
+  if(Math.abs(delta) > 0.5){
+    window.scrollBy(0, delta);
+    ensureRendered();          /* the corrected viewport may expose new systems */
+  }
+}
+
 function render(){
   var p = piece();
+  var anchor = captureScrollAnchor();     /* before a single DOM mutation */
   renderHeader(p);
   var box = document.getElementById('sysbox');
-  box.textContent='';
 
   if(!scoreParts(p).length && !guideParts(p).length){
+    box.textContent='';
     box.appendChild(h('div','empty-hint','Choose parts from the panel to build a score.'));
     currentLayout = null;
+    currentPages = [];
+    updatePageHint();
     return;
   }
+  /* Measure and lay out BEFORE emptying the box: contentWidth() reads clientWidth,
+     which forces a synchronous layout, and doing that with #sysbox already empty is
+     exactly what threw the reader back to page 1. */
   var cw = contentWidth();
   var L = layout(p, cw, spFor(cw));
+  box.textContent='';
   currentLayout = L;
   migrateAnnots(L);
 
@@ -2095,6 +2220,7 @@ function render(){
     box.appendChild(d);
   });
   ensureRendered();
+  restoreScrollAnchor(anchor);
   updatePageHint();
 }
 var SCREEN_HEADER_H = 150;
@@ -2174,6 +2300,7 @@ function buildSidebar(){
   var p = piece(), sb = document.getElementById('sidebar');
   sb.textContent='';
   initSidebarResize();          /* textContent='' removes the drag handle */
+  sb.appendChild(sheetHeader()); /* the sheet's own exit (phone/tablet overlay) */
   sb.appendChild(h('div','sb-note',
     'Off · Score · Guide. Score engraves the part. Guide shows a slim activity lane ' +
     'under each system. The dot sets that lane colour. Harp parts offer a B/W option.'));
@@ -2875,6 +3002,8 @@ document.addEventListener('visibilitychange', function(){
   node.addEventListener('touchend', function(e){
     var t = e.changedTouches[0];
     var dx = t.clientX - sx, dy = t.clientY - sy;
+    /* where a finger is the pen (phone), a horizontal stroke is ink, not a swipe */
+    if(touchDrawOK() && (ann.mode === 'draw' || ann.mode === 'text')) return;
     if(moved && Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)){
       turnPage(dx < 0 ? 1 : -1);
       return;
@@ -2910,6 +3039,15 @@ document.addEventListener('keydown', function(e){
     if(PEDAL_PREV[e.key]){ e.preventDefault(); turnPage(-1); return; }
     return;
   }
+  /* Escape is the universal way out of anything that covers the score */
+  if(e.key === 'Escape'){
+    if(tuner.open){ toggleTuner(); return; }
+    if(document.body.classList.contains('drawer')){ closeDrawer(); return; }
+    if(document.body.classList.contains('menu')){
+      document.body.classList.remove('menu'); return;
+    }
+    if(ann.mode){ setMode(''); return; }
+  }
   /* normal view: the same pedal steps the scroll by a viewport page */
   if(PEDAL_NEXT[e.key]){
     e.preventDefault(); window.scrollBy({top: window.innerHeight*0.86, behavior:'smooth'});
@@ -2922,11 +3060,44 @@ document.addEventListener('fullscreenchange', function(){
 });
 
 /* ==========================================================================
-   ANNOTATION INPUT — Pointer Events. Pen/mouse draw; touch never draws so
-   fingers keep scrolling and swiping pages.
+   ANNOTATION INPUT — Pointer Events, with a DEVICE-AWARE touch rule.
+
+   "touch never draws" is an iPad palm-rejection rule: it assumes an Apple Pencil
+   is available, so fingers can be reserved for scrolling. On a phone a finger is
+   the ONLY input, and that rule made draw mode a complete no-op there.
+
+   The rule is therefore tied to the device-mode system:
+     PHONE            one finger draws; two fingers pan the page (below).
+     TABLET / DESKTOP unchanged - pen and mouse draw, touch scrolls.
+     any 'pen' seen   palm rejection is restored everywhere, phone included,
+                      for the rest of the session.
+   The same test governs the eraser and TEXT placement taps.
    ========================================================================== */
+var PEN_SEEN = false;
+function touchDrawOK(){ return !PEN_SEEN && effectiveDevice() === 'phone'; }
+
 (function annotationInput(){
   var drawing = null, curSvg = null, curPointer = null, rafPending = false, textDrag = null, drawBase = null;
+  /* live touch points, used only when fingers are allowed to draw: with
+     touch-action:none the browser will not pan for us, so a second finger
+     cancels the stroke and pans the page by hand. */
+  var touchPts = {}, panning = null;
+  function nTouch(){ var n = 0; for(var k in touchPts) n++; return n; }
+  function touchMid(){
+    var x = 0, y = 0, n = 0;
+    for(var k in touchPts){ x += touchPts[k].x; y += touchPts[k].y; n++; }
+    return n ? {x:x/n, y:y/n} : null;
+  }
+  function abortStroke(){
+    if(curSvg && curSvg._annotG){
+      var live = curSvg._annotG.querySelector('.live');
+      if(live && live.parentNode) live.parentNode.removeChild(live);
+    }
+    if(curSvg && curPointer != null){
+      try{ curSvg.releasePointerCapture && curSvg.releasePointerCapture(curPointer); }catch(e){}
+    }
+    drawing = null; curSvg = null; drawBase = null; curPointer = null;
+  }
 
   function svgXY(svg, ev){
     var pt = svg.createSVGPoint();
@@ -2970,6 +3141,17 @@ document.addEventListener('fullscreenchange', function(){
   }
 
   function down(ev){
+    if(ev.pointerType === 'pen') PEN_SEEN = true;   /* palm rejection from here on */
+    /* finger bookkeeping, only while fingers are an ink input */
+    if(ev.pointerType === 'touch' && ann.mode && touchDrawOK()){
+      touchPts[ev.pointerId] = {x:ev.clientX, y:ev.clientY};
+      if(nTouch() >= 2){
+        /* second finger: this was a pan, not a stroke - undo the stroke and scroll */
+        abortStroke();
+        panning = touchMid();
+        return;
+      }
+    }
     /* ---- EAR: click a notehead to hear its true macrotonal pitch */
     if(ann.mode === 'ear'){
       var t = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -2988,7 +3170,7 @@ document.addEventListener('fullscreenchange', function(){
     }
     /* ---- TEXT: tap empty space to place, tap an item to edit, drag to move */
     if(ann.mode === 'text'){
-      if(ev.pointerType === 'touch') return;
+      if(ev.pointerType === 'touch' && !touchDrawOK()) return;
       if(!onPaper(ev)) return;
       var tsvg = inkTargetSvg(ev);
       if(!tsvg) return;
@@ -3007,7 +3189,7 @@ document.addEventListener('fullscreenchange', function(){
       return;
     }
     if(!ann.on) return;
-    if(ev.pointerType === 'touch') return;            /* fingers never draw */
+    if(ev.pointerType === 'touch' && !touchDrawOK()) return;   /* see the rule above */
     if(!onPaper(ev)) return;
     var svg = inkTargetSvg(ev);
     if(!svg) return;
@@ -3030,6 +3212,19 @@ document.addEventListener('fullscreenchange', function(){
     try{ svg.setPointerCapture && svg.setPointerCapture(ev.pointerId); curPointer = ev.pointerId; }catch(e){}
   }
   function move(ev){
+    /* two-finger pan: touch-action is none while drawing, so scroll by hand */
+    if(ev.pointerType === 'touch' && touchPts[ev.pointerId]){
+      touchPts[ev.pointerId] = {x:ev.clientX, y:ev.clientY};
+      if(panning){
+        var mid = touchMid();
+        if(mid){
+          window.scrollBy(panning.x - mid.x, panning.y - mid.y);
+          panning = touchMid();     /* re-read: the page moved under the fingers */
+        }
+        ev.preventDefault();
+        return;
+      }
+    }
     if(textDrag){
       if(Math.abs(ev.clientX-textDrag.sx) > 3 || Math.abs(ev.clientY-textDrag.sy) > 3)
         textDrag.moved = true;
@@ -3045,8 +3240,8 @@ document.addEventListener('fullscreenchange', function(){
       return;
     }
     if(!ann.on) return;
-    if(ev.pointerType === 'touch') return;
-    if(ann.erasing && (ev.buttons & 1)){
+    if(ev.pointerType === 'touch' && !touchDrawOK()) return;
+    if(ann.erasing && (ev.buttons & 1 || ev.pointerType === 'touch')){
       var s2 = svgUnder(ev); if(!s2) return;
       var p2 = svgXY(s2, ev); if(p2) eraseAt(s2, p2);
       return;
@@ -3075,6 +3270,11 @@ document.addEventListener('fullscreenchange', function(){
     }
   }
   function up(ev){
+    if(ev.pointerType === 'touch' && touchPts[ev.pointerId]){
+      delete touchPts[ev.pointerId];
+      if(nTouch() < 2) panning = null;
+      if(nTouch() > 0 || panning){ return; }   /* a pan gesture never lays ink */
+    }
     if(textDrag){
       var td = textDrag; textDrag = null;
       if(td.moved){ saveAnnots(); refreshAnnotations(); }
@@ -3130,6 +3330,14 @@ document.addEventListener('fullscreenchange', function(){
 })();
 
 function setMode(m){
+  /* Measure the real toolbar BEFORE hiding it: --bar-h is a 52px minimum, while the
+     phone toolbar actually stands 57px, and the difference showed up as the score
+     jumping when a mode was entered. The shell borrows the measured height back. */
+  var tbNode = document.getElementById('topbar');
+  if(tbNode && !ann.mode){
+    var tbH = Math.round(tbNode.getBoundingClientRect().height);
+    if(tbH) document.documentElement.style.setProperty('--modepad', tbH + 'px');
+  }
   ann.mode = (ann.mode === m) ? '' : m;
   ann.on = (ann.mode === 'draw');
   if(ann.mode !== 'draw') ann.erasing = false;
@@ -3141,6 +3349,10 @@ function setMode(m){
   if(bar) bar.style.display = showTools ? 'flex' : 'none';
   var pf = document.getElementById('pfann');
   if(pf) pf.style.display = (showTools && perf.on) ? 'flex' : 'none';
+  /* phone: the mode owns the chrome via the bottom mode bar (see buildModeBar) */
+  document.body.classList.toggle('modeon', !!ann.mode);
+  if(ann.mode) document.body.classList.remove('menu');   /* the fold menu is going away */
+  buildModeBar();
   if(ann.mode !== 'text') closeTextEditor();
   syncAnnUI();
 }
@@ -3162,6 +3374,11 @@ function syncAnnUI(){
   document.querySelectorAll('.wbtn').forEach(function(d){
     d.className = 'wbtn' + (+d.dataset.w === ann.width ? ' sel' : '');
   });
+  /* mode-bar toggles carry state, not a width, so they are synced after the loop */
+  var me = document.getElementById('mbErase');
+  if(me) me.className = 'wbtn' + (ann.erasing ? ' sel' : '');
+  var mv = document.getElementById('mbEye');
+  if(mv) mv.className = 'wbtn' + (ann.visible ? '' : ' sel');
 }
 
 /* ==========================================================================
@@ -3254,8 +3471,11 @@ function placeTuner(){
   var w = Math.min(420, window.innerWidth * 0.9);
   panel.style.width = w + 'px';
   if(tuner.x == null){ tuner.x = Math.max(8, window.innerWidth - w - 24); tuner.y = 84; }
-  tuner.x = Math.min(tuner.x, window.innerWidth - 60);
-  tuner.y = Math.min(tuner.y, window.innerHeight - 60);
+  /* Keep the WHOLE panel on screen horizontally. Clamping only the left edge let
+     the title bar - and with it the close ✕ at its right end - hang off a narrow
+     screen, so the tuner could not be shut. */
+  tuner.x = Math.max(0, Math.min(tuner.x, window.innerWidth - w));
+  tuner.y = Math.max(0, Math.min(tuner.y, window.innerHeight - 60));
   panel.style.left = Math.max(0, tuner.x) + 'px';
   panel.style.top  = Math.max(0, tuner.y) + 'px';
   panel.style.opacity = tuner.op;
@@ -3321,6 +3541,42 @@ function cycleDevice(){
 function isNarrowMode(){
   var d = effectiveDevice();
   return d === 'tablet' || d === 'phone';
+}
+
+/* ---------------------------------------------------------------- sheet exit
+   The overlay sidebar hides the toolbar that opened it, and at phone width it is
+   the full viewport, so the scrim behind it cannot be tapped. Every opened sheet
+   must therefore close from inside itself: a sticky 44px Done button, a
+   swipe-down on the header, and Escape. */
+function closeDrawer(){ document.body.classList.remove('drawer'); }
+function sheetHeader(){
+  var head = h('div','sb-head');
+  head.appendChild(h('div','sb-grab'));
+  head.appendChild(h('span','sb-title','Parts'));
+  var done = h('button','sb-done','Done');
+  done.setAttribute('aria-label','Close parts panel');
+  done.addEventListener('click', closeDrawer);
+  head.appendChild(done);
+
+  /* swipe down to dismiss - the same Pointer Events the ink layer uses */
+  var sy = null;
+  head.addEventListener('pointerdown', function(e){
+    if(e.target.closest('.sb-done')) return;
+    sy = e.clientY;
+    try{ head.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  head.addEventListener('pointermove', function(e){
+    if(sy == null) return;
+    if(e.clientY - sy > 60){ sy = null; closeDrawer(); }
+  });
+  function endSwipe(e){
+    if(sy == null) return;
+    sy = null;
+    try{ head.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  head.addEventListener('pointerup', endSwipe);
+  head.addEventListener('pointercancel', endSwipe);
+  return head;
 }
 
 /* ---------------------------------------------------------------- sidebar resize */
@@ -3436,6 +3692,43 @@ function buildAnnToolbars(){
   syncAnnUI();
 }
 
+/* PHONE mode bar: one compact, non-wrapping row of the active mode's tools plus a
+   fixed EXIT at the end. Rebuilt per mode so the row stays short enough to need no
+   wrapping - wrapping was what crushed the piece tabs and hid the DRAW toggle. */
+function buildModeBar(){
+  var host = document.getElementById('mbtools');
+  if(!host) return;
+  host.textContent = '';
+  if(!ann.mode) return;
+  var LABEL = {draw:'Draw', text:'Text', ear:'Ear · tap a notehead'};
+  host.appendChild(h('span','mb-label', LABEL[ann.mode] || ''));
+  if(ann.mode === 'ear') return;          /* EAR has no tools, only an exit */
+
+  ANN_COLORS.forEach(function(c){
+    var b = h('button','inkdot'); b.dataset.c = c;
+    var sp = document.createElement('span'); sp.style.background = c; b.appendChild(sp);
+    b.addEventListener('click', function(){ ann.colour = c; ann.erasing = false; syncAnnUI(); });
+    host.appendChild(b);
+  });
+  if(ann.mode === 'draw'){
+    [['Fine',1],['Med',1.9]].forEach(function(w){
+      var b = h('button','wbtn',w[0]); b.dataset.w = w[1];
+      b.addEventListener('click', function(){ ann.width = w[1]; syncAnnUI(); });
+      host.appendChild(b);
+    });
+  }
+  var er = h('button','wbtn','Erase'); er.id = 'mbErase';
+  er.addEventListener('click', function(){ ann.erasing = !ann.erasing; syncAnnUI(); });
+  host.appendChild(er);
+  var un = h('button','wbtn','Undo'); un.addEventListener('click', annUndo); host.appendChild(un);
+  var re = h('button','wbtn','Redo'); re.addEventListener('click', annRedo); host.appendChild(re);
+  var ey = h('button','wbtn','Hide ink'); ey.id = 'mbEye';
+  ey.addEventListener('click', function(){
+    ann.visible = !ann.visible; syncAnnUI(); refreshAnnotations();
+  });
+  host.appendChild(ey);
+}
+
 function boot(){
   loadLocal();
   loadAnnots();
@@ -3510,26 +3803,40 @@ function boot(){
   });
   document.getElementById('btnSidebar').addEventListener('click', function(){
     if(isNarrowMode()){
+      /* the sheet covers the fold menu, so close the menu with it */
+      document.body.classList.remove('menu');
       document.body.classList.toggle('drawer');
     } else {
       document.body.classList.toggle('nosidebar');
       setTimeout(render, 260);
     }
   });
-  document.getElementById('scrim').addEventListener('click', function(){
-    document.body.classList.remove('drawer');
-  });
+  document.getElementById('scrim').addEventListener('click', closeDrawer);
+  document.getElementById('mbexit').addEventListener('click', function(){ setMode(''); });
   window.addEventListener('hashchange', function(){
     if(suppressHash) return;
     if(applyHash()){ buildTabs(); registry.length=0; buildSidebar(); render(); }
   });
-  var rt=null;
+  /* Resize handling. Mobile Safari collapses and expands its URL bar as the reader
+     scrolls, firing resize with the WIDTH UNCHANGED. Fit-width cannot have changed,
+     so re-rendering on those is pure loss: it rebuilds the score and costs the
+     reader their place. Only genuine width (or device-mode) changes rebuild. */
+  var rt=null, lastW = window.innerWidth;
   window.addEventListener('resize', function(){
     clearTimeout(rt);
     rt = setTimeout(function(){
+      var w = window.innerWidth;
+      var widthChanged = (w !== lastW);
+      lastW = w;
+      var prevDev = document.body.getAttribute('data-dev');
       if(state.device === 'auto') applyDevice(false);
-      if(perf.on) repaginatePerform(); else render();
-    }, 180);
+      var devChanged = document.body.getAttribute('data-dev') !== prevDev;
+      if(perf.on){ repaginatePerform(); return; }   /* perform fits the height too */
+      if(!widthChanged && !devChanged){
+        ensureRendered(); updatePageHint(); return;  /* height-only: hold position */
+      }
+      render();
+    }, 200);
   });
   window.addEventListener('orientationchange', function(){
     setTimeout(function(){ if(perf.on) repaginatePerform(); else render(); }, 260);
@@ -3556,6 +3863,10 @@ function boot(){
     setSidebarWidth: setSidebarWidth,
     cycleDevice: cycleDevice, applyDevice: applyDevice,
     effectiveDevice: effectiveDevice,
+    closeDrawer: closeDrawer,
+    touchDrawOK: touchDrawOK,
+    penSeen: function(){ return PEN_SEEN; },
+    render: render,
     setDevice: function(d){ state.device=d; try{localStorage.setItem('ensembleDevice',d);}catch(e){} return applyDevice(true); },
     earFreq: earFreq, earPlay: earPlay, toggleTuner: toggleTuner, tuner: tuner,
     soundingMidi: soundingMidi,
