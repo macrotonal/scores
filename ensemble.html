@@ -674,10 +674,15 @@ var LETT  = 'CDEFGAB';
 var SEMIS = [0,2,4,5,7,9,11];
 
 /* clef -> diatonic step sitting on the TOP staff line */
-var CLEF_TOP = {G:38, F:26, C3:32, C1:28+4, C2:28+2, C4:28-2, C5:28-4};
+/* Clef codes are MuseScore's (tools/import_mscz.py passes them through): a C clef
+   is numbered by the staff line middle C sits on COUNTING FROM THE BOTTOM — C1
+   soprano, C2 mezzo, C3 alto, C4 tenor, C5 baritone. CLEF_TOP is the step of the
+   top line (C4 = 28): 28 + 2*(5 - line). Only G, F and C3 occur in the current
+   scores; the other C clefs had the numbering reversed and were corrected Sept 2026. */
+var CLEF_TOP = {G:38, F:26, C3:32, C1:28+8, C2:28+6, C4:28+2, C5:28};
 var CLEF_GLYPH = {G:'gClef', F:'fClef', C3:'cClef', C1:'cClef', C2:'cClef', C4:'cClef', C5:'cClef'};
 /* y of the glyph anchor line, in staff-space units from the top line */
-var CLEF_ANCHOR = {G:3, F:1, C3:2, C1:0, C2:1, C4:3, C5:4};
+var CLEF_ANCHOR = {G:3, F:1, C3:2, C1:4, C2:3, C4:1, C5:0};
 
 /* Key-signature accidental placement.
    The first sharp is the highest F at or below the top staff line; the first flat
@@ -2314,18 +2319,24 @@ function drawChord(root, L, s, si, ev, idx, x, top, clef, SP, stemUpHint, beamed
   }
 }
 
+/* Ledger lines continue the staff's own line spacing: one line at EVERY whole
+   staff space between the staff and the note — above the top line at -1, -2, …
+   and below the bottom line at 5, 6, … staff spaces from the top line — and a
+   note sitting in the space beyond the last of them gets no extra line. (Until
+   Sept 2026 this skipped every odd staff space, so a note one ledger line out had
+   none and read a third too close to the staff: Bass Clar 1's opening B5 read as
+   G5. Every build since at least 2026-08-07 had it.) tools/qa_ledgers.js audits
+   every notehead against this rule. */
 function drawLedgers(root, hx, y, top, hw, SP){
   var lw = hw*1.36, x0 = hx - (lw-hw)/2;
   var k;
   if(y < top - 0.01){
     for(k = -1; top + k*SP >= y - 0.01; k--){
-      if(k % 2 !== 0) continue;
       root.appendChild(el('line',{x1:r2(x0),y1:r2(top+k*SP),x2:r2(x0+lw),y2:r2(top+k*SP),
         stroke:'#000','stroke-width':r2(SP*0.12)}));
     }
   } else if(y > top + 4*SP + 0.01){
     for(k = 5; top + k*SP <= y + 0.01; k++){
-      if(k % 2 !== 0) continue;
       root.appendChild(el('line',{x1:r2(x0),y1:r2(top+k*SP),x2:r2(x0+lw),y2:r2(top+k*SP),
         stroke:'#000','stroke-width':r2(SP*0.12)}));
     }
@@ -4062,6 +4073,18 @@ function buildPrintPages(){
   var SP = baseSP(PW) * 0.7;      /* print is independent of screen zoom */
   var L = layout(p, PW, SP);
   var headH = 150;
+  /* Same rule as performance mode: paper cannot split a system, so every system
+     must fit one page whole — the first under the title block. A full score of
+     many staves is taller than A4 at the default print staff; without this its
+     lower staves ran off the bottom of every page (Golden Hour, RGB). */
+  for(var fitK = 0; fitK < 14 && L.systems.length; fitK++){
+    var tallest = 0;
+    L.systems.forEach(function(s){ tallest = Math.max(tallest, s.height); });
+    var fit = Math.min((PH - 22) / tallest, (PH - 22 - headH) / L.systems[0].height);
+    if(fit >= 1) break;
+    SP = SP * Math.max(0.5, fit) * 0.985;
+    L = layout(p, PW, SP);
+  }
   var pages = paginate(L, PH - 22, headH);
 
   printHost = h('div','printonly');
