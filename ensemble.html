@@ -1132,11 +1132,20 @@ function layout(p, contentW, SP){
   var lastGroup=null;
   staves.forEach(function(s, i){
     if(i>0){
-      var prev = staves[i-1];
+      var prev = staves[i-1], gap;
       y += LC.staffH*SP;
-      if(prev.part === s.part) y += LC.staffGap*SP*0.85;         /* grand staff */
-      else if(prev.group === s.group) y += LC.staffGap*SP;
-      else y += (LC.staffGap+LC.groupGap)*SP;
+      if(prev.part === s.part) gap = LC.staffGap*0.85;            /* grand staff */
+      else if(prev.group === s.group) gap = LC.staffGap;
+      else gap = LC.staffGap+LC.groupGap;
+      /* Engraved markings share this gap: the upper staff's dynamics and
+         hairpins hang below it, the lower staff's breath commas and staff text
+         sit above. When both bands and clear space between them do not fit, the
+         gap widens (see markBandBelow). A pair of staves with no markings keeps
+         its spacing exactly. */
+      if(prev.staff.mk || s.staff.mk){
+        gap = Math.max(gap, markBandBelow(prev.staff) + markBandAbove(s.staff) + 2*MK.markClear);
+      }
+      y += gap*SP;
     }
     staffTops.push(y);
   });
@@ -1367,13 +1376,16 @@ var BARNUM_LABEL = {'off':'Bars · off', 'system':'Bars · system',
    engraved it.
    ========================================================================== */
 var MK = {
-  breathY:  -0.15,   /* comma baseline */
+  breathY:  -0.50,   /* comma baseline — where the player's MuseScore engraving puts it */
   dynBase:   6.30,   /* dynamic glyph baseline */
   dynAbove: -2.35,
   hairAxis:  6.10,   /* hairpin axis — the dynamics' optical centre */
   hairAbove:-2.55,
   hairAp:    0.55,   /* half-aperture at the open end (matches the stamp layer) */
   hairW:     0.16,   /* stroke width           (matches the stamp layer) */
+  hairCont:  0.25,   /* half-opening kept at a hairpin's broken end (MuseScore: 0.5sp) */
+  hairInset: 0.40,   /* a wedge stops this far short of a system's end barline */
+  markClear: 0.30,   /* least white space between a marking and other ink */
   textSize:  1.35,
   textAbove:-1.55,
   textBelow: 5.90,
@@ -1388,6 +1400,122 @@ var DYN_GLYPH = {pp:'dynamicPP', p:'dynamicPiano', mp:'dynamicMP',
                  mf:'dynamicMF', f:'dynamicForte', ff:'dynamicFF'};
 
 function rhBoxH(SP){ return SP*MK.rhSize*0.74 + 2*MK.rhPadY*SP; }
+
+/* The vertical bands a staff's markings occupy, in staff spaces: how far below
+   the bottom line its below-staff markings reach, and how far above the top line
+   its above-staff markings reach — the worst case over the markings the staff
+   carries anywhere in the piece. layout() sizes the gap between two staves from
+   these, so the upper staff's dynamics and hairpins and the lower staff's breath
+   commas and staff text can never be engraved into each other. */
+function dynDepth(sub){
+  var name = DYN_GLYPH[String(sub).toLowerCase()], g = name && GL.g[name];
+  return g ? Math.max(0, -g.b[1]/GSCALE_DEN) : 0.3;
+}
+function markBandBelow(st){
+  var mk = st && st.mk, d = 0;
+  if(!mk) return 0;
+  (mk.hp || []).forEach(function(r){ if(r[5] !== 1) d = Math.max(d, MK.hairAxis + MK.hairAp + MK.hairW/2 - 4); });
+  (mk.dy || []).forEach(function(r){ if(r[3] !== 1) d = Math.max(d, MK.dynBase + dynDepth(r[2]) - 4); });
+  (mk.tx || []).forEach(function(r){ if(r[3] === 2) d = Math.max(d, MK.textBelow + MK.textSize*0.3 - 4); });
+  return d;
+}
+function markBandAbove(st){
+  var mk = st && st.mk, h = 0;
+  if(!mk) return 0;
+  if(mk.br && mk.br.length){
+    var g = GL.g.breathMarkComma;
+    h = Math.max(h, -MK.breathY + (g ? g.b[3]/GSCALE_DEN : 1.3));
+  }
+  (mk.tx || []).forEach(function(r){ if(r[3] !== 2) h = Math.max(h, -MK.textAbove + MK.textSize*0.8); });
+  (mk.dy || []).forEach(function(r){ if(r[3] === 1) h = Math.max(h, -MK.dynAbove + 1.2); });
+  (mk.hp || []).forEach(function(r){ if(r[5] === 1) h = Math.max(h, -MK.hairAbove + MK.hairAp + MK.hairW/2); });
+  return h;
+}
+
+/* Boxes (root coordinates) of the ink appended to `root` from child index n0 on,
+   read straight from the attributes the engraver wrote — lines, Leland glyphs,
+   beams and ties — so the markings can be settled against the notation that was
+   actually drawn, not against a re-derivation of it. */
+var GLYPH_BY_D = null;
+function inkBoxes(root, n0, out){
+  if(!GLYPH_BY_D){ GLYPH_BY_D = {}; for(var k in GL.g) GLYPH_BY_D[GL.g[k].d] = GL.g[k]; }
+  for(var i = n0; i < root.childNodes.length; i++){
+    var nd = root.childNodes[i], tag = nd.tagName, b = null, w;
+    if(tag === 'line'){
+      w = (+nd.getAttribute('stroke-width') || 0)/2;
+      var x1 = +nd.getAttribute('x1'), x2 = +nd.getAttribute('x2');
+      var y1 = +nd.getAttribute('y1'), y2 = +nd.getAttribute('y2');
+      b = [Math.min(x1, x2) - w, Math.min(y1, y2) - w, Math.max(x1, x2) + w, Math.max(y1, y2) + w];
+    } else if(tag === 'path'){
+      var tr = nd.getAttribute('transform');
+      if(tr){
+        var g = GLYPH_BY_D[nd.getAttribute('d')];
+        var m = g && /translate\(([-\d.e]+),([-\d.e]+)\)\s*scale\(([-\d.e]+)/.exec(tr);
+        if(m){
+          var gx = +m[1], gy = +m[2], s = +m[3];
+          b = [gx + g.b[0]*s, gy - g.b[3]*s, gx + g.b[2]*s, gy - g.b[1]*s];
+        }
+      } else {
+        var n = (nd.getAttribute('d').match(/-?\d*\.?\d+(?:e-?\d+)?/g) || []).map(Number);
+        if(n.length >= 4){
+          var xs = [], ys = [];
+          for(var j = 0; j + 1 < n.length; j += 2){ xs.push(n[j]); ys.push(n[j+1]); }
+          w = (+nd.getAttribute('stroke-width') || 0)/2;
+          b = [Math.min.apply(0, xs) - w, Math.min.apply(0, ys) - w,
+               Math.max.apply(0, xs) + w, Math.max.apply(0, ys) + w];
+        }
+      }
+    }
+    if(b) out.push(b);
+  }
+}
+
+/* Settle one staff's markings against the ink already drawn on this system.
+   Below the staff, dynamics and hairpins move down TOGETHER — one line per staff
+   per system, so a "< p >" stays one gesture — just far enough to clear the
+   staff's own low ink (down-stems, ledger lines, ties, dots), and never past the
+   band layout() reserved for the staff underneath. Above it, each breath comma
+   keeps its release-point x and rises just clear of whatever it would land on,
+   never into the band of the staff above (or the rehearsal row on the top staff). */
+function settleMarks(boxes, L, s, si, SP, ink){
+  var top = L.staffTops[si], bot = top + 4*SP, clear = MK.markClear*SP;
+  var mine = ink[si] || [];
+  var below = boxes.filter(function(m){ return (m.k === 'hp' || m.k === 'dy') && m.y > bot; });
+  if(below.length){
+    var need = 0, lowest = -1e9;
+    below.forEach(function(m){
+      var x0 = m.x0 - 0.25*SP, x1 = m.x1 + 0.25*SP, edge = (m.k === 'hp') ? m.y0 + 0.2*SP : m.y0;
+      mine.forEach(function(b){
+        if(b[2] > x0 && b[0] < x1 && b[3] > bot + 0.01*SP) need = Math.max(need, b[3] + clear - edge);
+      });
+      lowest = Math.max(lowest, m.y1);
+    });
+    if(need > 0){
+      var nxt = L.staves[si+1];
+      var floor = nxt ? L.staffTops[si+1] - (markBandAbove(nxt.staff)*SP + clear)
+                      : bot + (markBandBelow(s.staff) + 1)*SP;
+      var shift = Math.min(need, Math.max(0, floor - lowest));
+      below.forEach(function(m){ m.y += shift; m.y0 += shift; m.y1 += shift; });
+    }
+  }
+  var ceil = si > 0
+    ? L.staffTops[si-1] + (4 + markBandBelow(L.staves[si-1].staff))*SP + clear
+    : top - (MK.rhGap - MK.markClear)*SP;
+  boxes.forEach(function(m){
+    if(m.k !== 'br') return;
+    function lands(){
+      for(var i = 0; i < mine.length; i++){
+        var b = mine[i];
+        if(b[2] > m.x0 - 0.1*SP && b[0] < m.x1 + 0.1*SP &&
+           b[1] < m.y1 + clear*0.5 && b[3] > m.y0 - clear*0.5) return true;
+      }
+      return false;
+    }
+    for(var k = 0; k < 16 && lands() && m.y0 - 0.25*SP >= ceil; k++){
+      m.y -= 0.25*SP; m.y0 -= 0.25*SP; m.y1 -= 0.25*SP;
+    }
+  });
+}
 
 /* Absolute position of (bar, t) in whole notes from the top of the piece.
    Only hairpins need it — to work out how far through a wedge a system break
@@ -1476,34 +1604,58 @@ function staffMarkBoxes(L, sys, s, si, SP){
 
   (mk.hp || []).forEach(function(hp){
     if(hp[2] < range[0] || hp[0] > range[1]) return;
-    var above = hp[5] === 1;
-    var y = top + (above ? MK.hairAbove : MK.hairAxis)*SP;
-    var a = markX(L, sys, s, hp[0], hp[1], SP);
-    var b = markX(L, sys, s, hp[2], hp[3], SP);
-    var lastCol = sys.colX[sys.colX.length-1];
-    var x0 = a ? a.x : sys.musicStart;
-    var x1 = b ? b.x : (lastCol.x + lastCol.w);
-    if(x1 - x0 < 0.6*SP) x1 = x0 + 0.6*SP;      /* never draw a degenerate wedge */
-
-    /* A hairpin that crosses a system break is drawn once per system, and the
-       fragment on the second system must carry on from the aperture the first
-       one reached — a continuation that closes back to a point would read as a
-       second, separate hairpin. Progress is measured in MUSICAL time, not in x,
-       because the two systems are justified to different densities. */
     var p = L.piece;
     var A = absT(p, hp[0], hp[1]), B = absT(p, hp[2], hp[3]);
-    var span = B - A;
-    var uA = a ? A : absT(p, range[0], 0);
-    var uB = b ? B : absT(p, range[1] + 1, 0);
-    var fA = span > 0 ? Math.min(1, Math.max(0, (uA - A)/span)) : 0;
-    var fB = span > 0 ? Math.min(1, Math.max(0, (uB - A)/span)) : 1;
-    var ap = MK.hairAp*SP;
-    var apA = (hp[4] === 0) ? ap*fA : ap*(1-fA);
-    var apB = (hp[4] === 0) ? ap*fB : ap*(1-fB);
+    var sA = absT(p, range[0], 0), sB = absT(p, range[1] + 1, 0);
+    /* No music on this system: a wedge that stops exactly on this system's
+       opening barline (or starts on its closing one) belongs wholly to the
+       neighbouring system. Drawing it here left a stray stub. */
+    if(B <= sA + 1e-9 || A >= sB - 1e-9) return;
+    var above = hp[5] === 1;
+    var y = top + (above ? MK.hairAbove : MK.hairAxis)*SP;
+    var begins = A >= sA - 1e-9;                 /* starts on this system      */
+    var ends   = B <= sB + 1e-9;                 /* finishes on this system    */
+    /* Nothing reaches the final barline: a wedge that runs to (or through) the
+       system's end stops just short of it, and a continuation resumes just
+       after the next system's opening barline. */
+    var edgeR = sys.right - MK.hairInset*SP, edgeL = sys.musicStart + MK.hairInset*SP;
+    var a = begins ? markX(L, sys, s, hp[0], hp[1], SP) : null;
+    var b = (ends && B < sB - 1e-9) ? markX(L, sys, s, hp[2], hp[3], SP) : null;
+    var x0 = a ? a.x : edgeL;
+    var x1 = b ? Math.min(b.x, edgeR) : edgeR;
+    var minLen = 0.8*SP;                         /* never a degenerate wedge   */
+    if(x1 - x0 < minLen){
+      x1 = Math.min(edgeR, x0 + minLen);
+      if(x1 - x0 < minLen) x0 = Math.max(sys.musicStart, x1 - minLen);
+    }
+
+    /* A hairpin that crosses a system break is drawn once per system, the way
+       the player's MuseScore engraving draws it: every segment keeps its full
+       opening at the wide end, and the broken end is left slightly open
+       (hairCont) — on the first system for a diminuendo that has not finished,
+       on the continuation for a crescendo — so neither half can be misread as
+       a separate, complete hairpin. */
+    var ap = MK.hairAp*SP, cont = MK.hairCont*SP;
+    var apA, apB;
+    if(hp[4] === 0){ apA = begins ? 0 : cont; apB = ap; }
+    else           { apA = ap; apB = ends ? 0 : cont; }
     var mx = Math.max(apA, apB);
-    out.push({k:'hp', x0:x0, x1:x1, y:y, apA:apA, apB:apB,
+    out.push({k:'hp', row:hp, x0:x0, x1:x1, y:y, apA:apA, apB:apB,
               y0:y-mx-0.2*SP, y1:y+mx+0.2*SP});
   });
+  /* Wedges in sequence on one line ("< >") must not touch: where one ends at
+     (or just past) the point the next begins, pull both ends back to leave a
+     small gap, as the player's engraving does. Neither is shortened below a
+     readable length. */
+  var wedges = out.filter(function(m){ return m.k === 'hp'; })
+                  .sort(function(a, b){ return a.x0 - b.x0; });
+  for(var wi = 1; wi < wedges.length; wi++){
+    var wa = wedges[wi-1], wb = wedges[wi], want = 0.6*SP;
+    if(Math.abs(wa.y - wb.y) > 0.01 || wb.x0 - wa.x1 >= want || wb.x0 - wa.x1 < -1.2*SP) continue;
+    var mid = (wa.x1 + wb.x0)/2;
+    wa.x1 = Math.max(wa.x0 + 0.8*SP, Math.min(wa.x1, mid - want/2));
+    wb.x0 = Math.min(wb.x1 - 0.8*SP, Math.max(wb.x0, mid + want/2));
+  }
 
   (mk.tx || []).forEach(function(tx){
     var q = markX(L, sys, s, tx[0], tx[1], SP);
@@ -1513,6 +1665,14 @@ function staffMarkBoxes(L, sys, s, si, SP){
     var y = top + (below ? MK.textBelow : MK.textAbove)*SP;
     var tw = textW(tx[2], fs);
     var tX = fit(q.x, tw);
+    /* A cue belongs to its own bar. Grouped staves carry the barline through the
+       gap the text sits in, so slide it back to end clear of the barline that
+       closes its bar — never further back than that bar's own start. */
+    var tc = colOf(sys, tx[0]);
+    if(tc && tc.count === 1){
+      var barEnd = tc.x + tc.w - MK.markClear*SP;
+      if(tX + tw > barEnd) tX = Math.max(tc.x + MK.markClear*SP, barEnd - tw, L.labelW);
+    }
     out.push({k:'tx', txt:tx[2], x:tX, y:y, fs:fs,
               x0:tX, x1:tX + tw, y0:y-fs*0.8, y1:y+fs*0.25});
   });
@@ -1544,7 +1704,9 @@ function rehearsalBoxes(L, sys, SP){
 
 function drawScoreMarks(root, L, sys, SP){
   L.staves.forEach(function(s, si){
-    staffMarkBoxes(L, sys, s, si, SP).forEach(function(m){
+    var boxes = staffMarkBoxes(L, sys, s, si, SP);
+    if(root._staffInk) settleMarks(boxes, L, s, si, SP, root._staffInk);
+    boxes.forEach(function(m){
       if(m.k === 'br'){
         root.appendChild(glyph('breathMarkComma', m.x, m.y, SP, '#000'));
       } else if(m.k === 'dy'){
@@ -1823,12 +1985,16 @@ function renderSystem(L, sys){
   drawBarNumbers(root, L, sys, SP);
 
   /* ---- columns */
+  var marked = L.staves.some(function(s){ return !!s.staff.mk; });
+  var staffInk = L.staves.map(function(){ return []; });    /* for settleMarks */
   sys.colX.forEach(function(cx, ci){
     if(cx.count > 1){
       drawMultirest(root, L, cx, SP);
     } else {
       L.staves.forEach(function(s, si){
+        var n0 = root.childNodes.length;
         drawMeasure(root, L, s, si, cx, SP, noteIndex, ties, sys);
+        if(marked) inkBoxes(root, n0, staffInk[si]);
       });
     }
     /* barline at the right edge of the column */
@@ -1839,7 +2005,21 @@ function renderSystem(L, sys){
   drawBarlines(root, L, sys.colX[0].x, SP, false, true);
 
   /* ---- ties */
+  var nTie = root.childNodes.length;
   drawTies(root, ties, noteIndex, sys, L, SP);
+  if(marked){
+    var tieInk = [];
+    inkBoxes(root, nTie, tieInk);
+    tieInk.forEach(function(b){               /* a tie belongs to the nearest staff */
+      var cy = (b[1] + b[3])/2, best = 0, bd = 1e9;
+      L.staffTops.forEach(function(t, k){
+        var d = Math.abs(cy - t - 2*SP);
+        if(d < bd){ bd = d; best = k; }
+      });
+      staffInk[best].push(b);
+    });
+    root._staffInk = staffInk;
+  }
 
   /* ---- score markings (the player's engraved edition) */
   drawScoreMarks(root, L, sys, SP);
@@ -3960,21 +4140,56 @@ function repaginatePerform(){
   /* Fit the page box, not just its width: a landscape iPad is short, so the
      width-derived staff size can leave a single system stranded on each page.
      Step the staff size down until at least two systems share a page. */
-  var headH = 96;
+  /* The first page carries the title block. Measure it at this width instead of
+     assuming a height: a long selection title wraps, and the old fixed 96px was
+     one reason pages overflowed. */
+  var headH = performHeaderH(host, innerW);
   var wSP = baseSP(innerW) * (state.zoom / 100);
-  var L = null;
+  var L = null, sp = wSP;
+  function tallestOf(Lx){
+    var m = 0;
+    Lx.systems.forEach(function(s){ m = Math.max(m, s.height); });
+    return m;
+  }
   var TRIES = [1, 0.88, 0.78, 0.68, 0.6, 0.52, 0.45];
   for(var t = 0; t < TRIES.length; t++){
-    L = layout(p, innerW, Math.max(3.6, wSP * TRIES[t]));
-    var tallest = 0;
-    L.systems.forEach(function(s){ tallest = Math.max(tallest, s.height); });
-    if(!L.systems.length || tallest * 2 <= innerH - headH || t === TRIES.length - 1) break;
+    sp = Math.max(3.6, wSP * TRIES[t]);
+    L = layout(p, innerW, sp);
+    if(!L.systems.length || tallestOf(L) * 2 <= innerH - headH || t === TRIES.length - 1) break;
+  }
+  /* A performance page is a window with no scrolling, so every system MUST fit
+     it whole — and the first system must fit under the title block. A full score
+     of many staves can need a smaller staff than the ladder above reaches (at
+     1440x900 Golden Hour's full score lost the bottom of every page), so keep
+     shrinking — proportionally, then laying out again because line breaks move —
+     until it fits. Losing music off the bottom of a page is never acceptable. */
+  function fitRatio(Lx){
+    if(!Lx.systems.length) return 1;
+    return Math.min(innerH / tallestOf(Lx), (innerH - headH) / Lx.systems[0].height);
+  }
+  for(var k = 0; k < 14 && fitRatio(L) < 1; k++){
+    sp = sp * Math.max(0.5, fitRatio(L)) * 0.985;
+    L = layout(p, innerW, sp);
   }
   perf.L = L;
   migrateAnnots(L);
   perf.pages = paginate(L, innerH, headH);
   if(perf.page >= perf.pages.length) perf.page = Math.max(0, perf.pages.length-1);
   drawPerformPage();
+}
+/* height of the performance title block (page 1 only) at this page width */
+function performHeaderH(host, innerW){
+  var src = document.getElementById('schead');
+  if(!src) return 96;
+  var probe = h('div');
+  probe.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;width:' + innerW + 'px';
+  var hd = h('div', 'schead');
+  hd.innerHTML = src.innerHTML;
+  probe.appendChild(hd);
+  host.appendChild(probe);
+  var r = hd.getBoundingClientRect().height;
+  probe.remove();
+  return Math.ceil(r) + 10 + 2;              /* + its 10px bottom margin, + slack */
 }
 function drawPerformPage(){
   var host = document.getElementById('pfpage');
