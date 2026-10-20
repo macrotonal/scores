@@ -262,6 +262,9 @@ body.nosidebar .sidebar{display:none}
 .tri button.on{background:#fff; color:var(--ink)}
 .tri button.on.g{background:var(--accent); color:#fff}
 .tri button.mixed{background:rgba(255,255,255,0.35); color:var(--ink)}
+.cond-btn{width:100%; margin:4px 0 10px}
+.cond-aside{opacity:.38; pointer-events:none}
+.btn:disabled{opacity:.45; cursor:default}
 .sb-note{
   font-family:'Observer Text Italic','Georgia',serif; font-style:italic;
   font-size:12px; color:rgba(212,232,216,0.62); line-height:1.55; margin:2px 0 12px;
@@ -769,8 +772,34 @@ var state = {
   sidebarW: 270,    /* resizable sidebar width, persisted */
   device: 'auto',   /* auto | phone | tablet | desktop */
   barNums: 'system', /* off | system | 5 | all - bar-number frequency */
+  conductor: false, /* conductor score: every part, score order, resting staves hidden */
   sp: 7.2
 };
+
+/* ==========================================================================
+   CONDUCTOR SCORE
+   A view mode, not a selection: it engraves every part of the piece in
+   conventional score order (clarinets, saxophones, harp, strings), hides any
+   staff that rests through a whole system (the first system always shows the
+   full instrumentation), engraves smaller so more bars sit on a system, and
+   numbers every bar. The reader's own part choices are left untouched, so
+   switching it off returns to exactly what they had.
+   ========================================================================== */
+var COND = {
+  sp: 0.55,          /* staff size relative to the reading view */
+  printSp: 0.62,     /* print: relative to the A4 reading print size, on A3 */
+  spacing: 0.75      /* horizontal note spacing (the fastest notes still clear a head) */
+};
+function condRank(name){
+  var n = String(name).toLowerCase();
+  if(/clar/.test(n)) return 0;
+  if(/sax/.test(n))  return 1;
+  if(/harp/.test(n)) return 3;
+  if(/string|violin|viola|cello/.test(n)) return 4;
+  return 2;                         /* anything else sits between winds and harp */
+}
+function condK(){ return state.conductor ? COND.sp : 1; }
+function barNumMode(){ return state.conductor ? 'all' : (state.barNums || 'system'); }
 
 /* Zoom stops — clean fixed ladder including exactly 100%. */
 var ZOOM_STOPS = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
@@ -782,7 +811,11 @@ function baseSP(contentW){
   return Math.max(5, Math.min(13, contentW / 78));
 }
 function spFor(contentW){
-  return baseSP(contentW) * (state.zoom / 100);
+  var sp = baseSP(contentW) * (state.zoom / 100) * condK();
+  /* the conductor score on a narrow screen: never smaller than the reading
+     view's own floor (baseSP's 5px minimum is reached on phones) */
+  if(state.conductor) sp = Math.max(sp, 4.5 * state.zoom / 100);
+  return sp;
 }
 
 function laneColour(p, pi){
@@ -876,11 +909,21 @@ function isBarRest(staff, bar){
 
 /* ---------------------------------------------------------------- selection */
 function scoreParts(p){
+  if(state.conductor){
+    var all = p.parts.map(function(_, i){ return i; });
+    all.sort(function(a, b){
+      var ga = p.parts[a].group, gb = p.parts[b].group;
+      var ra = condRank(p.groups[ga].name), rb = condRank(p.groups[gb].name);
+      return ra !== rb ? ra - rb : (ga !== gb ? ga - gb : a - b);
+    });
+    return all;
+  }
   var s = selOf(p), out=[];
   for(var i=0;i<p.parts.length;i++) if(s[i]===1) out.push(i);
   return out;
 }
 function guideParts(p){
+  if(state.conductor) return [];
   var s = selOf(p), out=[];
   for(var i=0;i<p.parts.length;i++) if(s[i]===2) out.push(i);
   return out;
@@ -900,6 +943,7 @@ function scoreStaves(p){
 
 /* ---------------------------------------------------------------- title */
 function selectionTitle(p){
+  if(state.conductor) return 'Conductor Score';
   var sp = scoreParts(p);
   if(sp.length === 0) return null;
   if(sp.length === 1) return p.parts[sp[0]].display;
@@ -996,7 +1040,7 @@ function stepY(step, clef){            /* y in staff spaces below the TOP line *
    ========================================================================== */
 function spaceFor(d){
   var u = Math.log(d/(1/64)) / Math.LN2;
-  return LC.noteMin + LC.noteK * Math.max(0, u);
+  return (LC.noteMin + LC.noteK * Math.max(0, u)) * (state.conductor ? COND.spacing : 1);
 }
 
 /* width (in staff spaces) needed by one bar for a set of staves */
@@ -1153,30 +1197,66 @@ function layout(p, contentW, SP){
   if(cur.length) systems.push({cols:cur, w:curW, startExtra:curExtra});
 
   /* geometry */
-  var staffTops=[], y=0;
-  var lastGroup=null;
-  staves.forEach(function(s, i){
-    if(i>0){
-      var prev = staves[i-1], gap;
-      y += LC.staffH*SP;
-      if(prev.part === s.part) gap = LC.staffGap*0.85;            /* grand staff */
-      else if(prev.group === s.group) gap = LC.staffGap;
-      else gap = LC.staffGap+LC.groupGap;
-      /* Engraved markings share this gap: the upper staff's dynamics and
-         hairpins hang below it, the lower staff's breath commas and staff text
-         sit above. When both bands and clear space between them do not fit, the
-         gap widens (see markBandBelow). A pair of staves with no markings keeps
-         its spacing exactly. */
-      if(prev.staff.mk || s.staff.mk){
-        gap = Math.max(gap, markBandBelow(prev.staff) + markBandAbove(s.staff) + 2*MK.markClear);
+  function stackStaves(list){
+    var tops=[], y=0;
+    list.forEach(function(s, i){
+      if(i>0){
+        var prev = list[i-1], gap;
+        y += LC.staffH*SP;
+        if(prev.part === s.part) gap = LC.staffGap*0.85;            /* grand staff */
+        else if(prev.group === s.group) gap = LC.staffGap;
+        else gap = LC.staffGap+LC.groupGap;
+        /* Engraved markings share this gap: the upper staff's dynamics and
+           hairpins hang below it, the lower staff's breath commas and staff text
+           sit above. When both bands and clear space between them do not fit, the
+           gap widens (see markBandBelow). A pair of staves with no markings keeps
+           its spacing exactly. */
+        if(prev.staff.mk || s.staff.mk){
+          gap = Math.max(gap, markBandBelow(prev.staff) + markBandAbove(s.staff) + 2*MK.markClear);
+        }
+        y += gap*SP;
       }
-      y += gap*SP;
-    }
-    staffTops.push(y);
-  });
-  var staffBlockH = staves.length ? (staffTops[staffTops.length-1] + LC.staffH*SP) : 0;
+      tops.push(y);
+    });
+    return {tops: tops, blockH: list.length ? (tops[tops.length-1] + LC.staffH*SP) : 0};
+  }
+  var stack0 = stackStaves(staves);
+  var staffTops = stack0.tops, staffBlockH = stack0.blockH;
+
+  /* CONDUCTOR: a staff that rests through a whole system is left out of it.
+     The first system keeps the full instrumentation; a multi-staff part (harp)
+     stays whole; a system where everything rests keeps its top staff to carry
+     the bar rest. Each trimmed system gets its own staff stack (sys.vStaves …)
+     and, once the layout object exists, its own view of it (sys.view). */
+  function staffActive(st, b0, b1){
+    for(var b=b0; b<=b1; b++) if(!isBarRest(st, b)) return true;
+    var mk = st.mk;
+    if(!mk) return false;
+    var hit = function(rows, endIdx){
+      return (rows || []).some(function(r){
+        var a = r[0], z = endIdx == null ? a : r[endIdx];
+        return z >= b0 && a <= b1;
+      });
+    };
+    return hit(mk.br) || hit(mk.dy) || hit(mk.tx) || hit(mk.hp, 2);
+  }
+  if(state.conductor && staves.length > 1){
+    systems.forEach(function(sys, i){
+      if(i === 0) return;
+      var b0 = sys.cols[0].bar, lc = sys.cols[sys.cols.length-1];
+      var b1 = lc.bar + (lc.count > 1 ? lc.count-1 : 0);
+      var keepPart = {};
+      staves.forEach(function(s){ if(staffActive(s.staff, b0, b1)) keepPart[s.part] = 1; });
+      var vis = staves.filter(function(s){ return keepPart[s.part]; });
+      if(!vis.length) vis = [staves[0]];
+      if(vis.length === staves.length) return;
+      var st = stackStaves(vis);
+      sys.vStaves = vis; sys.vTops = st.tops; sys.vBlockH = st.blockH;
+    });
+  }
 
   var laneH = guides.length ? (LC.laneTop*SP + guides.length*(LC.laneH+LC.laneGap)*SP) : 0;
+  var stavesAll = staves, staffTopsAll = staffTops, staffBlockHAll = staffBlockH;
 
   /* Vertical extent of the notation actually drawn in a system, in root-group
      coordinates (0 = top staff line of the first staff). Notes above/below the
@@ -1184,6 +1264,8 @@ function layout(p, contentW, SP){
      all live outside the staff rectangle, so system bounds must follow content
      rather than the staff block, or they get sliced. */
   function contentExtent(sys){
+    var staves = sys.vStaves || stavesAll, staffTops = sys.vTops || staffTopsAll;
+    var staffBlockH = sys.vBlockH != null ? sys.vBlockH : staffBlockHAll;
     var minY = 0, maxY = staffBlockH;
     sys.cols.forEach(function(c){
       if(c.count > 1) return;                       /* multirest: labels only */
@@ -1265,9 +1347,10 @@ function layout(p, contentW, SP){
     /* space above the top staff line: notation overflow, or the bar number /
        multirest count, whichever needs more */
     sys.topPad = Math.max(LC.barnumH*SP, 2.9*SP, -ext.min);
-    var bottomOverflow = Math.max(0, ext.max - staffBlockH);
+    var blockH = sys.vBlockH != null ? sys.vBlockH : staffBlockH;
+    var bottomOverflow = Math.max(0, ext.max - blockH);
     sys.bottomOverflow = bottomOverflow;
-    sys.height = sys.topPad + staffBlockH + bottomOverflow + laneH + LC.systemGap*SP;
+    sys.height = sys.topPad + blockH + bottomOverflow + laneH + LC.systemGap*SP;
     /* justify: distribute slack across columns */
     var natural = sys.cols.reduce(function(a,c){ return a + c.w*SP; }, 0);
     var target = availW - sys.startExtra;
@@ -1286,12 +1369,20 @@ function layout(p, contentW, SP){
     sys.labelW = labelW;
   });
 
-  return {
+  var L = {
     systems: systems, staves: staves, guides: guides,
     staffTops: staffTops, staffBlockH: staffBlockH,
     laneH: laneH, SP: SP, labelW: labelW,
     contentW: contentW, piece: p, nbars: nbars
   };
+  /* a trimmed system's view: the same layout, with only its own staves */
+  systems.forEach(function(sys){
+    if(!sys.vStaves) return;
+    var v = Object.create(L);
+    v.staves = sys.vStaves; v.staffTops = sys.vTops; v.staffBlockH = sys.vBlockH;
+    sys.view = v;
+  });
+  return L;
 }
 
 /* width in px of the clef + key signature (+ time signature) block at a system start */
@@ -1853,7 +1944,7 @@ function barNumBlockers(L, sys, SP){
 }
 
 function drawBarNumbers(root, L, sys, SP){
-  var mode = state.barNums || 'system';
+  var mode = barNumMode();
   if(mode === 'off' || !sys.colX.length) return;
   var size = SP*1.3, HOME = -0.6*SP, ascent = size*0.78, baseY = HOME;
   var firstBar = sys.colX[0].bar;
@@ -1891,6 +1982,13 @@ function drawBarNumbers(root, L, sys, SP){
      'system' mode is deliberately left alone - it is the default, and its
      single number has always sat on this line. */
   var blocks = (mode === 'system') ? [] : barNumBlockers(L, sys, SP);
+  /* Rehearsal boxes never PUSH the row (they sit above it by design), but a lift
+     must not carry the numbers up into one: a high top staff (the conductor
+     score's clarinets) lifted them straight into the box. Added after the
+     HOME-band scan below would ignore them anyway, so only clashes() sees them. */
+  var rhBlocks = (mode === 'system') ? [] : rehearsalBoxes(L, sys, SP).map(function(b){
+    return {x0:b.x, x1:b.x + b.w, y0:b.y0, y1:b.y1, rh:true};
+  });
   var pad = size*0.15;
   function hitsASlot(b){
     for(var k=0;k<slots.length;k++){
@@ -1899,8 +1997,9 @@ function drawBarNumbers(root, L, sys, SP){
     return false;
   }
   function clashes(y){                    /* anything inked in the row's band */
-    for(var i=0;i<blocks.length;i++){
-      var b = blocks[i];
+    var all = blocks.concat(rhBlocks);
+    for(var i=0;i<all.length;i++){
+      var b = all[i];
       if(b.y0 < y + size*0.08 && b.y1 > y - ascent && hitsASlot(b)) return true;
     }
     return false;
@@ -1951,6 +2050,7 @@ function drawBarNumbers(root, L, sys, SP){
 }
 
 function renderSystem(L, sys){
+  if(sys.view) L = sys.view;            /* conductor: this system's own staves */
   var p = L.piece, SP = L.SP;
   var W = L.contentW, H = sys.height;
   var svg = el('svg', {
@@ -3123,6 +3223,7 @@ function markInkOwners(g){
    anchor = [staffId, bar, fracWithinBar, yInStaffSpacesFromMidline]           */
 function anchorAt(L, sysIdx, x, y){
   var sys = L.systems[sysIdx];
+  if(sys && sys.view) L = sys.view;
   if(!sys || !L.staves.length) return null;
   var SP = L.SP;
   /* nearest staff by midline */
@@ -3155,6 +3256,7 @@ function anchorAt(L, sysIdx, x, y){
 /* musical anchor -> point in this system, or null if it does not live here */
 function pointFor(L, sysIdx, a){
   var sys = L.systems[sysIdx];
+  if(sys && sys.view) L = sys.view;
   if(!sys) return null;
   var SP = L.SP;
   var si = -1;
@@ -3378,9 +3480,18 @@ function buildSidebar(){
   sb.textContent='';
   initSidebarResize();          /* textContent='' removes the drag handle */
   sb.appendChild(sheetHeader()); /* the sheet's own exit (phone/tablet overlay) */
-  sb.appendChild(h('div','sb-note',
-    'Off · Score · Guide. Score engraves the part. Guide shows a slim activity lane ' +
-    'under each system. The dot sets that lane colour. Harp parts offer a B/W option.'));
+  var cbtn = h('button', 'btn cond-btn' + (state.conductor ? ' on' : ''),
+               state.conductor ? 'Conductor score · on' : 'Conductor score');
+  cbtn.setAttribute('aria-pressed', state.conductor ? 'true' : 'false');
+  cbtn.title = 'Every part in score order, resting staves hidden, smaller staves, every bar numbered';
+  cbtn.addEventListener('click', toggleConductor);
+  sb.appendChild(cbtn);
+  sb.appendChild(h('div','sb-note', state.conductor
+    ? 'Showing every part in score order — clarinets, saxophones, harp, strings — with ' +
+      'staves hidden while they rest. Print / PDF gives an A3 conductor score. ' +
+      'Turn it off to return to your own part choices.'
+    : 'Off · Score · Guide. Score engraves the part. Guide shows a slim activity lane ' +
+      'under each system. The dot sets that lane colour. Harp parts offer a B/W option.'));
 
   p.groups.forEach(function(g, gi){
     var box = h('div','grp');
@@ -3407,8 +3518,16 @@ function buildSidebar(){
       row.appendChild(ctrl);
       box.appendChild(row);
     });
+    if(state.conductor) box.classList.add('cond-aside');
     sb.appendChild(box);
   });
+}
+function toggleConductor(){
+  state.conductor = !state.conductor;
+  buildSidebar();
+  applyBarNums(false);
+  commit();
+  toast(state.conductor ? 'Conductor score: every part, score order' : 'Back to your part selection');
 }
 
 /* lane colour swatch; on a group row it sets every member's lane */
@@ -3552,6 +3671,7 @@ function encodeHash(){
   if(cIdx.length){
     out += '/c' + cIdx.map(function(k){ return k + '-' + String(co[k]).replace('#',''); }).join(',');
   }
+  if(state.conductor) out += '/conductor';
   return out;
 }
 function applyHash(){
@@ -3571,8 +3691,10 @@ function applyHash(){
       if(v===1||v===2) state.sel[p.id][i]=v;
     }
   }
+  state.conductor = bits.indexOf('conductor') > 1;
   for(var k=2;k<bits.length;k++){
     var seg = bits[k];
+    if(seg === 'conductor') continue;
     if(seg[0] === 'b'){
       seg.slice(1).split(',').forEach(function(t){
         var n = parseInt(t,10);
@@ -3595,6 +3717,7 @@ function saveLocal(){
     localStorage.setItem('ensemblePiece', piece().id);
     localStorage.setItem('ensembleZoom', String(state.zoom));
     localStorage.setItem('ensembleBarNums', state.barNums);
+    localStorage.setItem('ensembleConductor', state.conductor ? '1' : '0');
   }catch(e){}
 }
 function loadLocal(){
@@ -3624,6 +3747,7 @@ function loadLocal(){
       state.zoom = near;
     }
     state.warm = localStorage.getItem('ensembleWarm') === '1';
+    state.conductor = localStorage.getItem('ensembleConductor') === '1';
     var bnm = localStorage.getItem('ensembleBarNums');
     if(bnm && BARNUM_MODES.indexOf(bnm) >= 0) state.barNums = bnm;
     var sbw = parseInt(localStorage.getItem('ensembleSidebarW'), 10);
@@ -4100,10 +4224,14 @@ var printHost = null;
 function buildPrintPages(){
   cleanupPrint();
   var p = piece();
-  /* A4 portrait at 96dpi minus margins */
-  var PW = Math.round(210/25.4*96) - Math.round(20/25.4*96);
-  var PH = Math.round(297/25.4*96) - Math.round(26/25.4*96);
-  var SP = baseSP(PW) * 0.7;      /* print is independent of screen zoom */
+  /* A4 portrait at 96dpi minus margins; the conductor score prints on A3 */
+  var paper = state.conductor ? [297, 420] : [210, 297];
+  var PW = Math.round(paper[0]/25.4*96) - Math.round(20/25.4*96);
+  var PH = Math.round(paper[1]/25.4*96) - Math.round(26/25.4*96);
+  var SP = baseSP(PW) * 0.7 * (state.conductor ? COND.printSp : 1);   /* independent of screen zoom */
+  var pageCss = document.getElementById('pagesize');
+  if(!pageCss){ pageCss = document.createElement('style'); pageCss.id = 'pagesize'; document.head.appendChild(pageCss); }
+  pageCss.textContent = state.conductor ? '@media print{@page{size:A3 portrait; margin:12mm 10mm 14mm}}' : '';
   var L = layout(p, PW, SP);
   var headH = 150;
   /* Same rule as performance mode: paper cannot split a system, so every system
@@ -4148,6 +4276,7 @@ function buildPrintPages(){
 }
 function cleanupPrint(){
   if(printHost){ printHost.remove(); printHost=null; }
+  var pageCss = document.getElementById('pagesize'); if(pageCss) pageCss.textContent = '';
   var sb = document.getElementById('sysbox'); if(sb) sb.style.display='';
   var sh = document.getElementById('schead'); if(sh) sh.style.display='';
 }
@@ -4200,7 +4329,7 @@ function repaginatePerform(){
      assuming a height: a long selection title wraps, and the old fixed 96px was
      one reason pages overflowed. */
   var headH = performHeaderH(host, innerW);
-  var wSP = baseSP(innerW) * (state.zoom / 100);
+  var wSP = baseSP(innerW) * (state.zoom / 100) * condK();
   var L = null, sp = wSP;
   function tallestOf(Lx){
     var m = 0;
@@ -4961,8 +5090,10 @@ function applyDevice(rerender){
 function applyBarNums(rerender){
   var b = document.getElementById('btnBarNums');
   if(b){
-    b.textContent = BARNUM_LABEL[state.barNums] || BARNUM_LABEL.system;
-    b.className = 'btn ghost' + (state.barNums === 'system' ? '' : ' on');
+    b.textContent = BARNUM_LABEL[barNumMode()] || BARNUM_LABEL.system;
+    b.className = 'btn ghost' + (barNumMode() === 'system' ? '' : ' on');
+    b.disabled = !!state.conductor;
+    b.title = state.conductor ? 'The conductor score numbers every bar' : 'Bar numbers';
   }
   if(rerender !== false){ render(); if(perf.on) repaginatePerform(); }
 }
