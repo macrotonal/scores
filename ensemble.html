@@ -557,22 +557,43 @@ body.performing .picker{display:none !important}
 /* ---------------------------------------------------------------- print */
 .printonly{display:none}
 @media print{
-  @page{size:A4 portrait; margin:12mm 10mm 14mm}
+  /* Zero browser margins: the page's own box carries the margins (mirrored for
+     double-sided printing), and with no margin left the browser has nowhere to
+     print its own title/date/URL header and footer (Chrome; Safari: untick
+     "Print headers and footers"). */
+  @page{size:A4 portrait; margin:0}
   body{background:#fff !important; color:#000 !important}
   .topbar,.sidebar,.scrim,.toast,#perform{display:none !important}
-  .shell{display:block}
-  .scorewrap{padding:0}
-  .paper{border:0; border-radius:0; padding:0; max-width:none; background:#fff !important}
+  /* !important: the phone/tablet screen rules (body[data-dev=…] .scorewrap {padding…})
+     are more specific, and their bottom padding pushed one blank sheet out after
+     the last page */
+  .shell{display:block; min-height:0 !important; height:auto !important}
+  .scorewrap{padding:0 !important; min-height:0 !important; height:auto !important}
+  .paper{border:0; border-radius:0; padding:0 !important; margin:0 !important; max-width:none;
+         min-height:0 !important; height:auto !important; background:#fff !important}
   body.warm{--paper:#fff}
   .printonly{display:block}
-  .prpage{page-break-after:always; break-after:page; position:relative; overflow:visible}
+  /* A print page is a box of the ISO-A shape sized by the paper's WIDTH, never a
+     fixed pixel height: every A size is the same shape, so a page laid out for
+     A3 prints whole on A4 (scaled) instead of spilling its footer onto a second,
+     otherwise blank sheet — which is what Safari did, as it ignores @page size.
+     96% of the width leaves room if a browser still keeps a small margin. */
+  .prpage{
+    position:relative; box-sizing:border-box; width:96%; margin:0 auto;
+    aspect-ratio:210/297; overflow:hidden;
+    break-after:page; page-break-after:always; break-inside:avoid; page-break-inside:avoid;
+    padding:5% 4.5% 6.5% 6.5%;              /* recto: binding gutter on the left */
+  }
+  .prpage.verso{padding-left:4.5%; padding-right:6.5%}   /* verso: gutter on the right */
   .prpage .sys, .prpage svg{overflow:visible}
   .prpage:last-child{page-break-after:auto; break-after:auto}
   .prfoot{
-    position:absolute; bottom:0; left:0; right:0;
+    position:absolute; bottom:2.8%; left:6.5%; right:4.5%;
     font-family:'Observer Text Italic','Georgia',serif; font-style:italic; font-size:9px; color:#555;
     display:flex; justify-content:space-between; border-top:.5px solid #ccc; padding-top:3px;
   }
+  /* page numbers sit on the OUTER corner of each side */
+  .prpage.verso .prfoot{left:4.5%; right:6.5%; flex-direction:row-reverse}
   .sys{break-inside:avoid; page-break-inside:avoid}
 }
 </style>
@@ -943,7 +964,7 @@ function scoreStaves(p){
 
 /* ---------------------------------------------------------------- title */
 function selectionTitle(p){
-  if(state.conductor) return 'Conductor Score';
+  if(state.conductor) return "Conductor's Score";
   var sp = scoreParts(p);
   if(sp.length === 0) return null;
   if(sp.length === 1) return p.parts[sp[0]].display;
@@ -3775,9 +3796,12 @@ function commit(){
 /* ==========================================================================
    EXPORTS
    ========================================================================== */
+/* "Golden Hour - Conductor's Score", "RGB - Strings", "Moonlit Eucalyptus - Viola 1":
+   the piece plus the adaptive title, safe as a file name. Used for downloads and,
+   during printing, as the document title the browser offers for the PDF. */
 function fileBase(){
   var p = piece();
-  return p.title + ' — ' + (selectionTitle(p) || 'Score');
+  return (p.title + ' - ' + (selectionTitle(p) || 'Score')).replace(/[\/\\:*?"<>|]+/g, '-');
 }
 function download(name, mime, text){
   var blob = new Blob([text], {type:mime});
@@ -4215,23 +4239,31 @@ function doPrint(){
   var p = piece();
   if(!scoreParts(p).length && !guideParts(p).length){ toast('Nothing selected.'); return; }
   buildPrintPages();
+  /* the browser names the PDF after the document title */
+  if(printTitle == null) printTitle = document.title;
+  document.title = fileBase();
   setTimeout(function(){
     window.print();
     setTimeout(cleanupPrint, 800);
   }, 120);
 }
+var printTitle = null;
 var printHost = null;
 function buildPrintPages(){
   cleanupPrint();
   var p = piece();
-  /* A4 portrait at 96dpi minus margins; the conductor score prints on A3 */
+  /* Page geometry mirrors the print CSS: a 96%-wide ISO-A box whose padding is
+     5% top, 6.5% bottom and 4.5% + 6.5% at the sides, all as fractions of the
+     box WIDTH (how CSS resolves padding). Laid out at the nominal paper size —
+     A4, or A3 for the conductor score — and the browser scales it to the sheet. */
   var paper = state.conductor ? [297, 420] : [210, 297];
-  var PW = Math.round(paper[0]/25.4*96) - Math.round(20/25.4*96);
-  var PH = Math.round(paper[1]/25.4*96) - Math.round(26/25.4*96);
+  var NW = paper[0]/25.4*96 * 0.96, NH = NW * 297/210;
+  var PW = Math.floor(NW * (1 - 0.065 - 0.045));
+  var PH = Math.floor((NH - NW*(0.05 + 0.065)) * 0.97);   /* 3% slack for the title block's text */
   var SP = baseSP(PW) * 0.7 * (state.conductor ? COND.printSp : 1);   /* independent of screen zoom */
   var pageCss = document.getElementById('pagesize');
   if(!pageCss){ pageCss = document.createElement('style'); pageCss.id = 'pagesize'; document.head.appendChild(pageCss); }
-  pageCss.textContent = state.conductor ? '@media print{@page{size:A3 portrait; margin:12mm 10mm 14mm}}' : '';
+  pageCss.textContent = state.conductor ? '@media print{@page{size:A3 portrait; margin:0}}' : '';
   var L = layout(p, PW, SP);
   var headH = 150;
   /* Same rule as performance mode: paper cannot split a system, so every system
@@ -4250,9 +4282,8 @@ function buildPrintPages(){
 
   printHost = h('div','printonly');
   pages.forEach(function(pg, pi){
-    var page = h('div','prpage');
-    page.style.height = PH+'px';
-    page.style.position='relative';
+    /* double-sided: page 1 is a right-hand (recto) page, page 2 its back (verso) */
+    var page = h('div','prpage ' + (pi % 2 === 0 ? 'recto' : 'verso'));
     if(pi === 0){
       var hd = h('div','schead');
       hd.style.marginBottom='14px';
@@ -4265,7 +4296,7 @@ function buildPrintPages(){
       page.appendChild(wrap);
     });
     var foot = h('div','prfoot');
-    foot.appendChild(h('span',null, p.title + ' — ' + (selectionTitle(p)||'')));
+    foot.appendChild(h('span',null, p.title + ' - ' + (selectionTitle(p)||'Score')));
     foot.appendChild(h('span',null, (pi+1) + ' / ' + pages.length));
     page.appendChild(foot);
     printHost.appendChild(page);
@@ -4276,6 +4307,7 @@ function buildPrintPages(){
 }
 function cleanupPrint(){
   if(printHost){ printHost.remove(); printHost=null; }
+  if(printTitle != null){ document.title = printTitle; printTitle = null; }
   var pageCss = document.getElementById('pagesize'); if(pageCss) pageCss.textContent = '';
   var sb = document.getElementById('sysbox'); if(sb) sb.style.display='';
   var sh = document.getElementById('schead'); if(sh) sh.style.display='';
