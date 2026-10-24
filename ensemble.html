@@ -6508,7 +6508,7 @@ else boot();
 setTimeout(function(){
 (function(){
 'use strict';
-const CFG = {"optics":"flat","plate":"#3f5d77","palettes":[{"name":"stone paper","ink":["#c4bead","#23211f","#e9b650","#cd4636","#e3ddcc","#3f5d77"]}],"share":[0.24,0.12,0.16,0.12,0.1,0.26],"ground":5,"deal":true,"hot":0,"vig":0,"shade":0.35,"grain":0.012,"instant":true,"fade":0.01,"frame":"main.scorewrap","shadow":{"base":"#33402f","lo":0.6,"hi":1.35,"grain":0.055,"inset":0,"invert":true,"clipTop":"#topbar"},"noInput":"a, button, input, select, textarea, label, summary, details, svg, img, canvas, video, audio, iframe, [onclick], [role], [tabindex], [contenteditable], .paper, .topbar, .sidebar, .picker, .modebar, .scrim","edgeBias":0,"noPour":true};
+const CFG = {"optics":"flat","plate":"#3f5d77","palettes":[{"name":"stone paper","ink":["#c4bead","#23211f","#e9b650","#cd4636","#e3ddcc","#3f5d77"]}],"share":[0.24,0.12,0.16,0.12,0.1,0.26],"ground":5,"deal":true,"hot":0,"vig":0,"shade":0.35,"grain":0.012,"instant":true,"fade":6.0,"frame":"main.scorewrap","shadow":{"base":"#33402f","lo":0.6,"hi":1.35,"grain":0.055,"inset":0,"invert":true,"clipTop":"#topbar"},"noInput":"a, button, input, select, textarea, label, summary, details, svg, img, canvas, video, audio, iframe, [onclick], [role], [tabindex], [contenteditable], .paper, .topbar, .sidebar, .picker, .modebar, .scrim","edgeBias":0,"noPour":true};
 const cv = document.getElementById('marble-canvas');
 if (!cv) return;
 
@@ -7075,8 +7075,10 @@ void main(){
               + rest * uInkS[INKS - 1];
       ls *= exp(-uShade * (F.w - 0.5));
       vec3 cs = mix(ls * 12.92, 1.055 * pow(ls, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, ls));
-      cs += paperGrain(gl_FragCoord.xy + 4099.0, uDpr) * uGrainS;
-      col = mix(col, mix(uPlateS, cs, uFade), inS);
+      /* the grain after the fade, so a page fading the shadow in from its card opens
+         on the same grained green, not a flat one */
+      vec3 sh = mix(uPlateS, cs, uFade) + paperGrain(gl_FragCoord.xy + 4099.0, uDpr) * uGrainS;
+      col = mix(col, sh, inS);
     }
   }
 #endif
