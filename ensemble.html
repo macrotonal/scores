@@ -4621,7 +4621,11 @@ function loadLocal(){
     if(bnm && BARNUM_MODES.indexOf(bnm) >= 0) state.barNums = bnm;
     var sbw = parseInt(localStorage.getItem('ensembleSidebarW'), 10);
     if(!isNaN(sbw)) state.sidebarW = sbw;
-    var dev = localStorage.getItem('ensembleDevice');
+    /* the layout choice lasts for this visit only: kept for good, a Tablet picked once
+       left a friend's Android phone in the tablet layout, zoomed out to a sliver
+       (Sam 2026-10-24); every new visit starts on Auto */
+    localStorage.removeItem('ensembleDevice');
+    var dev = sessionStorage.getItem('ensembleDevice');
     if(dev && DEVICE_MODES.indexOf(dev) >= 0) state.device = dev;
     var pid = localStorage.getItem('ensemblePiece');
     if(pid){
@@ -6047,7 +6051,7 @@ function cycleBarNums(){
 function cycleDevice(){
   var i = DEVICE_MODES.indexOf(state.device);
   state.device = DEVICE_MODES[(i + 1) % DEVICE_MODES.length];
-  try{ localStorage.setItem('ensembleDevice', state.device); }catch(e){}
+  try{ sessionStorage.setItem('ensembleDevice', state.device); }catch(e){}
   applyDevice(true);
 }
 /* the overlay-sidebar modes, used wherever the old width media query was */
@@ -6466,7 +6470,7 @@ function boot(){
     touchDrawOK: touchDrawOK,
     penSeen: function(){ return PEN_SEEN; },
     render: render,
-    setDevice: function(d){ state.device=d; try{localStorage.setItem('ensembleDevice',d);}catch(e){} return applyDevice(true); },
+    setDevice: function(d){ state.device=d; try{sessionStorage.setItem('ensembleDevice',d);}catch(e){} return applyDevice(true); },
     earFreq: earFreq, earPlay: earPlay, toggleTuner: toggleTuner, tuner: tuner,
     soundingMidi: soundingMidi,
     anchorAt: anchorAt, pointFor: pointFor,
