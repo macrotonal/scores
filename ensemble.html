@@ -69,6 +69,8 @@ button{font:inherit;cursor:pointer}
 .btn.ghost{background:transparent; border-color:rgba(239,231,210,0.45); color:var(--text)}
 .btn.ghost:hover{background:var(--accent); border-color:var(--accent); color:#fff}
 .btn.on{background:var(--accent); border-color:var(--accent); color:#fff}
+/* the outline toggles (Warm, Bars) light up white when on, as the piece tabs do */
+.btn.ghost.on{background:#fff; border-color:#fff; color:var(--ink)}
 .btn.icon{min-width:44px; padding:0 10px; font-size:13px; letter-spacing:0}
 .btn.perform{background:var(--accent); border-color:var(--accent); color:#fff}
 .btn.perform:hover{background:#fff; color:var(--accent); border-color:#fff}
@@ -806,6 +808,10 @@ body.performing .picker{display:none !important}
 html,body{-webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale}
 </style>
 <style>:root{--grain-img:url(data:image/jpeg;base64,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)}</style>
+<script>/* iPhone: iOS 26 Safari shows the page under its status bar only once the page is
+   scrolled, so this page sits scrolled a little (.ios-bleed in the CSS) */
+if (/iPhone|iPod/.test(navigator.userAgent) || /[?&]iosbleed/.test(location.search))   /* ?iosbleed: QA on a desktop */
+  document.documentElement.classList.add('ios-bleed');</script>
 <style id="marble">
 /* the marbling: fixed behind the page, faded in once the bath is drawing */
 .frame-bath { position: fixed; inset: 0; z-index: -1; pointer-events: none;
@@ -819,14 +825,85 @@ html.marble-on body { background: none !important; }
 .tb-bath { z-index: -1; pointer-events: none; opacity: 0; transition: opacity 6.0s ease; }
 html.marble-on .tb-bath.on { opacity: 1; }
 /* solid cover green with its grain, as before: the piece tabs, the outline buttons, the note */
-html.marble-on .topbar .tab:not(.on), html.marble-on .topbar .btn.ghost, html.marble-on .sb-note {
+html.marble-on .topbar .tab:not(.on), html.marble-on .topbar .btn.ghost:not(.on), html.marble-on .sb-note {
   background-color: var(--bg); background-image: var(--grain-img); background-size: 150px 150px; }
 html.marble-on .sb-note { padding: 10px 12px; border-radius: 4px; }
+/* the part panels: solid grained green while you choose parts, the shadow showing through
+   them only in conductor mode (Sam 2026-10-24) */
+html.marble-on .sidebar .grp { background-color: var(--bg); background-image: var(--grain-img); background-size: 150px 150px; }
+html.marble-on .sidebar:has(.cond-btn[aria-pressed="true"]) .grp { background: none; }
 @media print { .frame-bath, .tb-bath { display: none !important; } }
+
+/* the iPhone (.ios-bleed; ?iosbleed to QA on a desktop): edge to edge under Safari's bars, as
+   on the other pages (memory ios26_safari_bars). iOS 26 Safari paints its bars solid over
+   any fixed or sticky layer at the screen's edge, so here nothing is: the window scrolls
+   only by the --bleed (held by a snap point), the BODY scrolls the score (the explorer's
+   pageScroller()), and the bath and the top bar are ordinary layers on the window, which
+   the body, not being positioned, doesn't carry with it. The top bar runs up under the
+   status bar, its copy of the shadow showing there. */
+.ios-bleed { --bleed: 64px; height: auto; overflow-y: scroll; overscroll-behavior-y: none;
+  scroll-snap-type: y mandatory; scroll-behavior: auto; }
+.ios-bleed body { box-sizing: border-box; height: 100lvh; margin-top: var(--bleed);
+  padding-top: var(--tb-h, 0px); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
+.ios-bleed .frame-bath { position: absolute; top: 0; left: 0; right: 0; bottom: auto;
+  height: calc(100lvh + var(--bleed) + 160px); }
+.ios-bleed body .topbar { position: absolute; top: var(--bleed); left: 0; right: 0;
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
+  padding-left: calc(8px + env(safe-area-inset-left, 0px)); padding-right: calc(8px + env(safe-area-inset-right, 0px)); }
+/* a mode hides the top bar on a phone and the explorer pads the shell instead (--modepad) */
+.ios-bleed body[data-dev="phone"].modeon { padding-top: 0; }
+.ios-bleed body[data-dev="phone"] .tb-group.fold { top: calc(var(--tb-h, 57px) - 5px); }
+.ios-bleed body[data-dev="phone"] .sidebar { padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
+/* the drawer's scrim is a full-screen fixed layer even when invisible: only while open */
+.ios-bleed body:not(.drawer) .scrim { display: none !important; }
+.bleed-snap { display: none; }
+.ios-bleed .bleed-snap { display: block; position: absolute; top: var(--bleed); left: 0; width: 1px; height: 1px;
+  scroll-snap-align: start; pointer-events: none; }
 </style>
 </head>
 <body>
 <div class="frame-bath" aria-hidden="true"><canvas id="marble-canvas"></canvas></div>
+<div class="bleed-snap" aria-hidden="true"></div>
+<script>
+/* .ios-bleed: the snap point belongs to the window; the body leaves room for the top bar,
+   which no longer takes any (it is on the window, not in the page) */
+(function(){
+  var root = document.documentElement;
+  if (!root.classList.contains('ios-bleed')) return;
+  root.appendChild(document.querySelector('.bleed-snap'));
+  function fit(){
+    var bar = document.getElementById('topbar');
+    var h = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+    root.style.setProperty('--tb-h', h + 'px');
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    fit();
+    var bar = document.getElementById('topbar');
+    if (bar && window.ResizeObserver) new ResizeObserver(fit).observe(bar);
+  });
+  /* and again once the explorer has laid itself out for the phone */
+  window.addEventListener('load', function(){ fit(); setTimeout(fit, 400); setTimeout(fit, 1500); });
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', function(){ setTimeout(fit, 300); });
+})();
+</script>
+<script>
+/* .ios-bleed: open scrolled to the bleed; the snap point keeps it there */
+(function(){
+  var root = document.documentElement;
+  if (!root.classList.contains('ios-bleed')) return;
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  function settle(){
+    var b = parseFloat(getComputedStyle(root).getPropertyValue('--bleed')) || 0;
+    if (Math.abs(window.scrollY - b) > 1) window.scrollTo(0, b);
+  }
+  settle();
+  window.addEventListener('load', settle);
+  window.addEventListener('pageshow', settle);
+  window.addEventListener('orientationchange', function(){ setTimeout(settle, 300); });
+})();
+</script>
+
 
 <div class="topbar" id="topbar">
   <a class="tb-home" href="/" title="Macrotonal home" aria-label="Macrotonal home"><svg viewBox="0 0 1000 1000" aria-hidden="true"><line x1="500.0" y1="392.0" x2="500.0" y2="68.0"/><line x1="511.3" y1="392.6" x2="545.2" y2="70.4"/><line x1="522.5" y1="394.4" x2="589.8" y2="77.4"/><line x1="533.4" y1="397.3" x2="633.5" y2="89.1"/><line x1="543.9" y1="401.3" x2="675.7" y2="105.3"/><line x1="554.0" y1="406.5" x2="716.0" y2="125.9"/><line x1="563.5" y1="412.6" x2="753.9" y2="150.5"/><line x1="572.3" y1="419.7" x2="789.1" y2="179.0"/><line x1="580.3" y1="427.7" x2="821.0" y2="210.9"/><line x1="587.4" y1="436.5" x2="849.5" y2="246.1"/><line x1="593.5" y1="446.0" x2="874.1" y2="284.0"/><line x1="598.7" y1="456.1" x2="894.7" y2="324.3"/><line x1="602.7" y1="466.6" x2="910.9" y2="366.5"/><line x1="605.6" y1="477.5" x2="922.6" y2="410.2"/><line x1="607.4" y1="488.7" x2="929.6" y2="454.8"/><line x1="608.0" y1="500.0" x2="932.0" y2="500.0"/><line x1="607.4" y1="511.3" x2="929.6" y2="545.2"/><line x1="605.6" y1="522.5" x2="922.6" y2="589.8"/><line x1="602.7" y1="533.4" x2="910.9" y2="633.5"/><line x1="598.7" y1="543.9" x2="894.7" y2="675.7"/><line x1="593.5" y1="554.0" x2="874.1" y2="716.0"/><line x1="587.4" y1="563.5" x2="849.5" y2="753.9"/><line x1="580.3" y1="572.3" x2="821.0" y2="789.1"/><line x1="572.3" y1="580.3" x2="789.1" y2="821.0"/><line x1="563.5" y1="587.4" x2="753.9" y2="849.5"/><line x1="554.0" y1="593.5" x2="716.0" y2="874.1"/><line x1="543.9" y1="598.7" x2="675.7" y2="894.7"/><line x1="533.4" y1="602.7" x2="633.5" y2="910.9"/><line x1="522.5" y1="605.6" x2="589.8" y2="922.6"/><line x1="511.3" y1="607.4" x2="545.2" y2="929.6"/><line x1="500.0" y1="608.0" x2="500.0" y2="932.0"/><line x1="488.7" y1="607.4" x2="454.8" y2="929.6"/><line x1="477.5" y1="605.6" x2="410.2" y2="922.6"/><line x1="466.6" y1="602.7" x2="366.5" y2="910.9"/><line x1="456.1" y1="598.7" x2="324.3" y2="894.7"/><line x1="446.0" y1="593.5" x2="284.0" y2="874.1"/><line x1="436.5" y1="587.4" x2="246.1" y2="849.5"/><line x1="427.7" y1="580.3" x2="210.9" y2="821.0"/><line x1="419.7" y1="572.3" x2="179.0" y2="789.1"/><line x1="412.6" y1="563.5" x2="150.5" y2="753.9"/><line x1="406.5" y1="554.0" x2="125.9" y2="716.0"/><line x1="401.3" y1="543.9" x2="105.3" y2="675.7"/><line x1="397.3" y1="533.4" x2="89.1" y2="633.5"/><line x1="394.4" y1="522.5" x2="77.4" y2="589.8"/><line x1="392.6" y1="511.3" x2="70.4" y2="545.2"/><line x1="392.0" y1="500.0" x2="68.0" y2="500.0"/><line x1="392.6" y1="488.7" x2="70.4" y2="454.8"/><line x1="394.4" y1="477.5" x2="77.4" y2="410.2"/><line x1="397.3" y1="466.6" x2="89.1" y2="366.5"/><line x1="401.3" y1="456.1" x2="105.3" y2="324.3"/><line x1="406.5" y1="446.0" x2="125.9" y2="284.0"/><line x1="412.6" y1="436.5" x2="150.5" y2="246.1"/><line x1="419.7" y1="427.7" x2="179.0" y2="210.9"/><line x1="427.7" y1="419.7" x2="210.9" y2="179.0"/><line x1="436.5" y1="412.6" x2="246.1" y2="150.5"/><line x1="446.0" y1="406.5" x2="284.0" y2="125.9"/><line x1="456.1" y1="401.3" x2="324.3" y2="105.3"/><line x1="466.6" y1="397.3" x2="366.5" y2="89.1"/><line x1="477.5" y1="394.4" x2="410.2" y2="77.4"/><line x1="488.7" y1="392.6" x2="454.8" y2="70.4"/><circle cx="500" cy="500" r="109"/></svg></a>
@@ -1021,7 +1098,7 @@ var state = {
   bw: {},           /* pieceId -> { partIndex: 1 } render this part's noteheads black */
   annots: {},       /* pieceId -> [stroke] in musical coordinates */
   zoom: 100,        /* percent; 100 = fit width */
-  warm: false,      /* warm paper tint (screen only) */
+  warm: true,       /* warm paper tint (screen only); on unless turned off (Sam 2026-10-24) */
   sidebarW: 270,    /* resizable sidebar width, persisted */
   device: 'auto',   /* auto | phone | tablet | desktop */
   barNums: 'system', /* off | system | 5 | all - bar-number frequency */
@@ -4129,7 +4206,7 @@ function restoreScrollAnchor(k){
   }
   var delta = node.getBoundingClientRect().top - k.top;
   if(Math.abs(delta) > 0.5){
-    window.scrollBy(0, delta);
+    pageScroller().scrollBy(0, delta);
     ensureRendered();          /* the corrected viewport may expose new systems */
   }
 }
@@ -4228,12 +4305,20 @@ function ensureRendered(){
     }
   });
 }
+/* what scrolls the score: the window, except on the iPhone build of the site, where the
+   page runs edge to edge under Safari's bars and the body scrolls instead (html.ios-bleed,
+   added by the site's build; the page's own copy never sets it) */
+function pageScroller(){
+  return document.documentElement.classList.contains('ios-bleed') ? document.body : window;
+}
 var _scrollTick = false;
-window.addEventListener('scroll', function(){
+function _onPageScroll(){
   if(_scrollTick) return;
   _scrollTick = true;
   requestAnimationFrame(function(){ _scrollTick = false; ensureRendered(); updatePageHint(); });
-}, {passive:true});
+}
+window.addEventListener('scroll', _onPageScroll, {passive:true});
+document.body.addEventListener('scroll', _onPageScroll, {passive:true});
 
 function renderAllSync(L){
   /* used by print / export: force every system into the DOM */
@@ -4268,7 +4353,7 @@ function buildSidebar(){
   sb.appendChild(h('div','sb-note', state.conductor
     ? 'Showing every part in score order (clarinets, saxophones, harp, strings), with ' +
       'staves hidden while they rest. With Ear on, click any note to hear its true pitch. ' +
-      'Print / PDF gives an A3 conductor score. Turn it off to return to your own part choices.'
+      'Print / PDF gives an A3 conductor score. Turn it off to choose your own parts.'
     : 'Off · Score · Guide. Score engraves the part. Guide shows a slim activity lane ' +
       'under each system. The dot sets that lane colour. Harp parts offer a B/W option. ' +
       'With Ear on, click any note to hear its true pitch.'));
@@ -4304,10 +4389,13 @@ function buildSidebar(){
 }
 function toggleConductor(){
   state.conductor = !state.conductor;
+  /* leaving the conductor score starts again from a blank page: every part off,
+     ready to choose from the panel (Sam 2026-10-24) */
+  if(!state.conductor) state.sel = {};
   buildSidebar();
   applyBarNums(false);
   commit();
-  toast(state.conductor ? 'Conductor score: every part, score order' : 'Back to your part selection');
+  toast(state.conductor ? 'Conductor score: every part, score order' : 'Choose parts from the panel to build a score');
 }
 
 /* lane colour swatch; on a group row it sets every member's lane */
@@ -4526,7 +4614,8 @@ function loadLocal(){
       ZOOM_STOPS.forEach(function(v){ if(Math.abs(v-z) < Math.abs(near-z)) near = v; });
       state.zoom = near;
     }
-    state.warm = localStorage.getItem('ensembleWarm') === '1';
+    /* a new key: everyone saved Warm off while it defaulted off, so start them on it */
+    state.warm = localStorage.getItem('ensembleWarm2') !== '0';
     state.conductor = localStorage.getItem('ensembleConductor') === '1';
     var bnm = localStorage.getItem('ensembleBarNums');
     if(bnm && BARNUM_MODES.indexOf(bnm) >= 0) state.barNums = bnm;
@@ -5113,9 +5202,10 @@ function buildPrintPages(){
     printHost.appendChild(page);
   });
   if(edition){
-    /* the back endpapers then the back page, which must be the last sheet's back: if the
-       music ends on a verso the endpaper is the inside back cover alone (a recto) */
-    if((pages.length + front) % 2 === 1) printHost.appendChild(editionEndpaper('l', true));
+    /* the back endpapers, always a facing pair (Sam: two halves of one marbled sheet), then
+       the back page: music ending on a verso gets a blank recto first */
+    if((pages.length + front) % 2 === 0) printHost.appendChild(h('div', 'prpage recto ed-blank'));
+    printHost.appendChild(editionEndpaper('l', true));
     printHost.appendChild(editionEndpaper('r', true));
     printHost.appendChild(editionBack());
   }
@@ -5345,9 +5435,9 @@ document.addEventListener('keydown', function(e){
   }
   /* normal view: the same pedal steps the scroll by a viewport page */
   if(PEDAL_NEXT[e.key]){
-    e.preventDefault(); window.scrollBy({top: window.innerHeight*0.86, behavior:'smooth'});
+    e.preventDefault(); pageScroller().scrollBy({top: window.innerHeight*0.86, behavior:'smooth'});
   } else if(PEDAL_PREV[e.key]){
-    e.preventDefault(); window.scrollBy({top: -window.innerHeight*0.86, behavior:'smooth'});
+    e.preventDefault(); pageScroller().scrollBy({top: -window.innerHeight*0.86, behavior:'smooth'});
   }
 });
 document.addEventListener('fullscreenchange', function(){
@@ -5564,7 +5654,7 @@ function touchDrawOK(){ return !PEN_SEEN && effectiveDevice() === 'phone'; }
       if(panning){
         var mid = touchMid();
         if(mid){
-          window.scrollBy(panning.x - mid.x, panning.y - mid.y);
+          pageScroller().scrollBy(panning.x - mid.x, panning.y - mid.y);
           panning = touchMid();     /* re-read: the page moved under the fingers */
         }
         ev.preventDefault();
@@ -5942,7 +6032,7 @@ function applyBarNums(rerender){
   var b = document.getElementById('btnBarNums');
   if(b){
     b.textContent = BARNUM_LABEL[barNumMode()] || BARNUM_LABEL.system;
-    b.className = 'btn ghost' + (barNumMode() === 'system' ? '' : ' on');
+    b.className = 'btn ghost' + (barNumMode() === 'off' ? '' : ' on');   /* lit whenever bars are numbered */
     b.disabled = !!state.conductor;
     b.title = state.conductor ? 'The conductor score numbers every bar' : 'Bar numbers';
   }
@@ -6061,7 +6151,7 @@ function setWarm(on){
   document.body.classList.toggle('warm', state.warm);
   var b = document.getElementById('btnWarm');
   if(b) b.className = 'btn ghost' + (state.warm ? ' on' : '');
-  try{ localStorage.setItem('ensembleWarm', state.warm ? '1' : '0'); }catch(e){}
+  try{ localStorage.setItem('ensembleWarm2', state.warm ? '1' : '0'); }catch(e){}
 }
 
 function setZoom(pct){
@@ -6414,7 +6504,7 @@ else boot();
 setTimeout(function(){
 (function(){
 'use strict';
-const CFG = {"optics":"flat","plate":"#3f5d77","palettes":[{"name":"stone paper","ink":["#c4bead","#23211f","#e9b650","#cd4636","#e3ddcc","#3f5d77"]}],"share":[0.24,0.12,0.16,0.12,0.1,0.26],"ground":5,"deal":true,"hot":0,"vig":0,"shade":0.35,"grain":0.012,"instant":true,"fade":0.01,"frame":"main.scorewrap","shadow":{"base":"#33402f","lo":0.6,"hi":1.35,"grain":0.055,"inset":0,"invert":true},"noInput":"a, button, input, select, textarea, label, summary, details, svg, img, canvas, video, audio, iframe, [onclick], [role], [tabindex], [contenteditable], .paper, .topbar, .sidebar, .picker, .modebar, .scrim","edgeBias":0,"noPour":true};
+const CFG = {"optics":"flat","plate":"#3f5d77","palettes":[{"name":"stone paper","ink":["#c4bead","#23211f","#e9b650","#cd4636","#e3ddcc","#3f5d77"]}],"share":[0.24,0.12,0.16,0.12,0.1,0.26],"ground":5,"deal":true,"hot":0,"vig":0,"shade":0.35,"grain":0.012,"instant":true,"fade":0.01,"frame":"main.scorewrap","shadow":{"base":"#33402f","lo":0.6,"hi":1.35,"grain":0.055,"inset":0,"invert":true,"clipTop":"#topbar"},"noInput":"a, button, input, select, textarea, label, summary, details, svg, img, canvas, video, audio, iframe, [onclick], [role], [tabindex], [contenteditable], .paper, .topbar, .sidebar, .picker, .modebar, .scrim","edgeBias":0,"noPour":true};
 const cv = document.getElementById('marble-canvas');
 if (!cv) return;
 
@@ -6467,11 +6557,15 @@ const maxAniso = aniso ? gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) :
 
 const ND = 24;      // drops still spreading since the last bake
 const NS = 12;      // stylus tips (a comb is several)
-const NV = 3;       // slow eddies
-const NOPS = 320;   // operations in the opening composition
+const NV = CFG.nv || 3;   // slow eddies (CFG.nv: a zoomed-out still needs many more to stir it)
+const NOPS = CFG.nops || 320;   // operations in the opening composition
+/* CFG.detail: zoomed out by this much, for print stills: the bath is that many times
+   larger in the same frame, so drops, eddies and flow all come out finer (give it
+   CFG.nops ~ 320 x detail^2, the opening needs that many more drops to cover it) */
+const DETAIL = CFG.detail || 1;
 const MARG = 0.14;  // world margin round the visible plate; eddies circulate through it
 const REF_CAP = CFG.refCap || (coarse ? 2048 : 2560);   // reference texture's long side, device px (CFG.refCap: print stills)
-const MAP_CAP = coarse ? 640 : 1024;
+const MAP_CAP = CFG.mapCap || (coarse ? 640 : 1024);   // the flow map (CFG.mapCap: zoomed-out print stills)
 
 /* ══ SHADERS ═══════════════════════════════════════════════════════════ */
 
@@ -7104,7 +7198,7 @@ function sizeFromHost(){
   DPR = Math.max(0.5, Math.min(window.devicePixelRatio || 1, 3) * quality);
   W = Math.max(2, Math.round(cssW * DPR));
   H = Math.max(2, Math.round(cssH * DPR));
-  const wu = Math.sqrt(cssW * cssH);
+  const wu = Math.sqrt(cssW * cssH) / DETAIL;
   VX = cssW / wu; VY = cssH / wu;
   DX = VX + 2 * MARG; DY = VY + 2 * MARG;
   const px = wu * DPR;                        // device px per world unit
@@ -7274,11 +7368,12 @@ function initVortices(rnd){
   /* with a card over the bath (CFG.frame) each eddy turns near one of its
      edges, where it shows */
   const edge = () => rnd() < 0.5 ? 0.03 + 0.08 * rnd() : 0.89 + 0.08 * rnd();
-  for (let i = 0; i < 2; i++){
+  const nEd = CFG.nv ? NV : 2, spread = CFG.nv ? [0.06, 0.88] : [0.26, 0.48];
+  for (let i = 0; i < nEd; i++){
     const across = frameEl ? rnd() < 0.5 : false;
     vorts.push({
-      nx: frameEl && !across ? edge() : 0.26 + 0.48 * rnd(),
-      ny: frameEl && across ? edge() : 0.26 + 0.48 * rnd(),
+      nx: frameEl && !across ? edge() : spread[0] + spread[1] * rnd(),
+      ny: frameEl && across ? edge() : spread[0] + spread[1] * rnd(),
       ax: 0.08 + 0.08 * rnd(), ay: 0.08 + 0.08 * rnd(),
       px: 70 + 60 * rnd(), py: 70 + 60 * rnd(),
       phx: rnd() * TAU, phy: rnd() * TAU,
@@ -7286,7 +7381,7 @@ function initVortices(rnd){
       w0: 0.08 + 0.05 * rnd(),
       T: 46 + 30 * rnd(),
       ph: 0.5 + 0.9 * rnd(),       // turning at boot, so the opening swirl carries on
-      sgn: i === 0 ? sgn0 : -sgn0
+      sgn: i % 2 === 0 ? sgn0 : -sgn0
     });
   }
   stepVortices();
@@ -7477,13 +7572,14 @@ function composeBoot(rnd){
   lay(cover[0], 0.035, 0.03, CFG.vein === undefined ? 0.5 : CFG.vein, 0);
   lay(cover[1], 0.055, 0.065, 0, 1);
   lay(cover[2], 0.11, 0.06, 0, 2);
-  for (let b = 0; b < 2; b++){
+  for (let b = 0; b < Math.round(2 * DETAIL * DETAIL); b++){   // as many per world area
     const x = (0.15 + 0.7 * rnd()) * VX, y = (0.15 + 0.7 * rnd()) * VY;
     let r = 0.10 + 0.05 * rnd();
     for (let k = 0; k < 3; k++){ ink = pickInk(ink, rnd); drop(x, y, r, ink); r *= 0.58 + 0.12 * rnd(); }
   }
-  op(2, VX * (0.3 + 0.4 * rnd()), VY * (0.3 + 0.4 * rnd()), rnd() * Math.PI,
-     (rnd() < 0.5 ? -1 : 1) * (0.06 + 0.06 * rnd()), 0.02 + 0.015 * rnd());
+  for (let k = 0; k < (CFG.rakes || 1); k++)        // CFG.rakes: more strokes across a zoomed-out still
+    op(2, VX * (0.1 + 0.8 * rnd()), VY * (0.1 + 0.8 * rnd()), rnd() * Math.PI,
+       (rnd() < 0.5 ? -1 : 1) * (0.06 + 0.06 * rnd()), 0.02 + 0.015 * rnd());
   for (const v of vorts){
     const c = vortCentre(v, 0);
     op(1, c[0], c[1], v.sgn * (2.0 + 1.6 * rnd()), v.R * 1.15, 0);
@@ -7841,7 +7937,8 @@ function stepSim(dt){
   /* bake every few seconds, preferably between drops' fast first spread */
   const since = t - tLastBake;
   const busy = drops.some(d => d.hold || d.u < 0.8);
-  if (since > 4 && (!busy || since > 8)) bake();
+  const every = CFG.bakeEvery || 4;   // CFG.bakeEvery: stills bake more often, so hard stretching stays smooth
+  if (since > every && (!busy || since > 2 * every)) bake();
 
   t += dt;
 }
@@ -7954,8 +8051,12 @@ function shadowOn(c, f, sx, sy, radCss){
   gl.uniform1f(L(pr, 'uGrainS'), S.grain);
   /* 1 css px in by default, under the card's border; a page with no border asks for less */
   const ins = S.inset === undefined ? 1 : S.inset;
+  /* S.clipTop: the card stops at the foot of that element (a pinned bar it scrolls under) */
+  let top = f.top;
+  const clip = S.clipTop && document.querySelector(S.clipTop);
+  if (clip) top = Math.max(top, clip.getBoundingClientRect().bottom);
   const x0 = (f.left - c.left + ins) * sx, x1 = (f.right - c.left - ins) * sx;
-  const y0 = (f.top - c.top + ins) * sy, y1 = (f.bottom - c.top - ins) * sy;
+  const y0 = (top - c.top + ins) * sy, y1 = (f.bottom - c.top - ins) * sy;
   gl.uniform4f(L(pr, 'uSRect'), 0.5 * (x0 + x1), H - 0.5 * (y0 + y1), 0.5 * (x1 - x0), 0.5 * (y1 - y0));
   gl.uniform1f(L(pr, 'uSRad'), Math.max(0, radCss - ins) * sx);
   gl.uniform1f(L(pr, 'uSInv'), S.invert ? 1 : 0);
