@@ -304,18 +304,46 @@ html,body{max-width:100%;overflow-x:hidden}
 /* desktop: the buttons end flush with the cards' right edge on every piece (Sam 2026-10-24) */
 @media (min-width:641px){ .piece-head .piece-audio{margin-left:auto; padding-left:24px; flex-shrink:0} }   /* the title side gives way, never the buttons */
 .pa-btns .btn{white-space:nowrap}
-.pa-btns .btn.dl{line-height:12px}   /* a fixed line, so the pair are identical boxes whatever the glyphs */
-/* Download and Conductor's Score a matching pair: equal widths, the wider one's */
-.pa-btns{display:grid; grid-template-columns:auto 1fr 1fr; align-items:center}
-.pa-btns .btn.dl{justify-content:center}
-/* a phone: the three on one row the width of the cards, the pair sharing it equally */
+/* Download and Conductor's Score a matching pair: equal widths (the longer label's, with
+   room either side), a fixed line so they are identical boxes whatever the glyphs, and
+   the capitals optically centred (Observer's caps sit high in their line) */
+.pa-btns{display:grid; grid-template-columns:auto 1fr 1fr; align-items:center; gap:10px}
+.pa-btns .btn.dl{justify-content:center; line-height:12px; padding:9px 26px 7px}
+/* a phone: still one row the width of the cards, the pair sharing it equally; the arrows
+   go (the words say it) and the play button shrinks a little, so the labels keep their
+   spacing with room either side */
 @media (max-width:640px){
   .piece-head .piece-audio{margin-left:0; width:100%}
-  .pa-btns{gap:6px; width:100%}
-  .pa-btns .btn.dl{min-width:0; padding-left:6px; padding-right:6px; letter-spacing:.07em; font-size:9px}
-  .pa-btns .btn.dl svg{margin-right:3px}
+  .pa-btns{gap:7px; width:100%}
+  .pa-btns .btn.play-main{width:46px; height:46px; min-width:46px}
+  .pa-btns .btn.dl{min-width:0; padding:9px 6px 7px; letter-spacing:.1em; font-size:9px}
+  .pa-btns .btn.dl svg{display:none}
 }
-@media (max-width:350px){ .pa-btns .btn.dl{letter-spacing:.03em; font-size:8.5px} .pa-btns .btn.dl svg{display:none} }
+@media (max-width:350px){ .pa-btns .btn.dl{letter-spacing:.05em; font-size:8.5px} }
+/* desktop: the conductor's score opens in a preview over the page, the browser's own PDF
+   viewer, with a download button (Sam 2026-10-24). Phones keep the plain download: their
+   browsers show only the first page of an embedded PDF. */
+.pdfview{position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
+  background:rgba(16,20,14,.72); opacity:0; transition:opacity .25s ease}
+.pdfview[hidden]{display:none}
+.pdfview.on{opacity:1}
+.pdfview-card{display:flex; flex-direction:column; width:min(1180px, 94vw); height:94vh;
+  background:var(--ab-green); border:2px solid #111; border-radius:8px; overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.55)}
+.pdfview-bar{display:flex; align-items:center; gap:10px; padding:12px 14px 12px 22px;
+  background-color:var(--ab-green); background-image:var(--ab-grain, none); background-size:256px 256px}
+.pdfview-title{flex:1 1 auto; min-width:0; color:#efe7d2; font-family:'Observer Sharp','Futura',sans-serif;
+  font-size:15px; letter-spacing:.14em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.pdfview-title em{font-family:'Observer Text Italic','Georgia',serif; font-style:italic; text-transform:none;
+  letter-spacing:.02em; opacity:.8; margin-left:10px; font-size:15px}
+.pdfview-bar .btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap;
+  line-height:12px; padding:8px 16px; border:2px solid #111; border-radius:4px; background:#fff; color:#111;
+  font-family:'Observer Sharp Book','Gill Sans','Gill Sans MT',sans-serif; font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; text-decoration:none; cursor:pointer}
+.pdfview-bar .btn svg{width:11px; height:11px; flex:none}
+.pdfview-bar .btn:hover{background:#efe7d2}
+.pdfview-frame{flex:1 1 auto; width:100%; border:0; background:#525659}
+html.pdfview-open, html.pdfview-open body{overflow:hidden}
 </style>
 <style id="ab-restyle">
 @font-face{font-family:'Observer Sharp';src:url(data:font/woff2;base64,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) format('woff2');font-weight:100 900;font-style:normal}
@@ -484,7 +512,7 @@ html.marble-on body { background: none !important; }
         <a class="btn dl" href="/scores/goldenhour.mp3" download>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download
         </a>
-        <a class="btn dl cond" href="/scores/golden-hour-conductors-score.pdf" download="Golden Hour - Conductor's Score.pdf">
+        <a class="btn dl cond" href="/scores/golden-hour-conductors-score.pdf" download="Golden Hour - Conductor's Score.pdf" data-preview="Golden Hour">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor's Score
         </a>
       </div>
@@ -626,7 +654,7 @@ html.marble-on body { background: none !important; }
       <div class="pa-btns">
         <button class="btn play play-main" data-src="/scores/rgb.mp3" onclick="playAudio('/scores/rgb.mp3','RGB - Full Demo','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 3l10 5-10 5V3z"/></svg></button>
         <a class="btn dl" href="/scores/rgb.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download</a>
-        <a class="btn dl cond" href="/scores/rgb-conductors-score.pdf" download="RGB - Conductor's Score.pdf">
+        <a class="btn dl cond" href="/scores/rgb-conductors-score.pdf" download="RGB - Conductor's Score.pdf" data-preview="RGB">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor's Score
         </a>
       </div>
@@ -705,7 +733,7 @@ html.marble-on body { background: none !important; }
       <div class="pa-btns">
         <button class="btn play play-main" data-src="/scores/moonliteucalyptus.mp3" onclick="playAudio('/scores/moonliteucalyptus.mp3','Moonlit Eucalyptus - Full Demo','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 3l10 5-10 5V3z"/></svg></button>
         <a class="btn dl" href="/scores/moonliteucalyptus.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download</a>
-        <a class="btn dl cond" href="/scores/moonlit-eucalyptus-conductors-score.pdf" download="Moonlit Eucalyptus - Conductor's Score.pdf">
+        <a class="btn dl cond" href="/scores/moonlit-eucalyptus-conductors-score.pdf" download="Moonlit Eucalyptus - Conductor's Score.pdf" data-preview="Moonlit Eucalyptus">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor's Score
         </a>
       </div>
@@ -1013,6 +1041,58 @@ function abClose() {
   abTime.textContent = '0:00'
   abCue.classList.remove('ready')
 }
+</script>
+
+<div class="pdfview" id="pdfview" hidden role="dialog" aria-modal="true" aria-labelledby="pdfview-title">
+  <div class="pdfview-card">
+    <div class="pdfview-bar">
+      <div class="pdfview-title" id="pdfview-title"></div>
+      <a class="btn dl pdfview-dl" id="pdfview-dl" href="#" download>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download
+      </a>
+      <button class="btn pdfview-x" id="pdfview-x" type="button" aria-label="Close the preview">Close</button>
+    </div>
+    <iframe class="pdfview-frame" id="pdfview-frame" title="Conductor's Score preview"></iframe>
+  </div>
+</div>
+<script>
+/* the conductor's score preview, on a desktop (a fine pointer and room for it); elsewhere
+   the button downloads the PDF as before */
+(function(){
+  var view = document.getElementById('pdfview'), frame = document.getElementById('pdfview-frame');
+  var dl = document.getElementById('pdfview-dl'), title = document.getElementById('pdfview-title');
+  var root = document.documentElement, back = null;
+  function desktop(){
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.innerWidth >= 900;
+  }
+  function open(a){
+    back = a;
+    title.textContent = a.getAttribute('data-preview');
+    var em = document.createElement('em'); em.textContent = "Conductor's Score"; title.appendChild(em);
+    dl.href = a.getAttribute('href');
+    dl.setAttribute('download', a.getAttribute('download'));
+    frame.src = a.getAttribute('href') + '#view=FitH';
+    view.hidden = false;
+    root.classList.add('pdfview-open');
+    requestAnimationFrame(function(){ view.classList.add('on'); });
+    document.getElementById('pdfview-x').focus();
+  }
+  function close(){
+    view.classList.remove('on');
+    root.classList.remove('pdfview-open');
+    setTimeout(function(){ view.hidden = true; frame.src = 'about:blank'; }, 250);
+    if (back) back.focus();
+  }
+  document.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[data-preview]');
+    if (!a || !desktop() || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    open(a);
+  });
+  document.getElementById('pdfview-x').addEventListener('click', close);
+  view.addEventListener('click', function(e){ if (e.target === view) close(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !view.hidden) close(); });
+})();
 </script>
 <script>
 /* start the shadow marbling a few seconds after the page, fade it in, then drop the page
