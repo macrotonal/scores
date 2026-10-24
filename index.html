@@ -301,6 +301,8 @@ html,body{max-width:100%;overflow-x:hidden}
 @media (min-width:641px){ .piece-head{flex-wrap:nowrap} }   /* the long subtitle breaks instead */
 .piece-head-left{flex:0 1 auto;min-width:0}
 .piece-head .piece-audio{margin-left:24px}
+/* desktop: the buttons end flush with the cards' right edge on every piece (Sam 2026-10-24) */
+@media (min-width:641px){ .piece-head .piece-audio{margin-left:auto; padding-left:24px} }
 .pa-btns .btn{white-space:nowrap}
 /* a phone: the three on one row under the title, a little tighter */
 @media (max-width:640px){
