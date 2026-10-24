@@ -304,6 +304,7 @@ html,body{max-width:100%;overflow-x:hidden}
 /* desktop: the buttons end flush with the cards' right edge on every piece (Sam 2026-10-24) */
 @media (min-width:641px){ .piece-head .piece-audio{margin-left:auto; padding-left:24px; flex-shrink:0} }   /* the title side gives way, never the buttons */
 .pa-btns .btn{white-space:nowrap}
+.pa-btns .btn.dl{line-height:12px}   /* a fixed line, so the pair are identical boxes whatever the glyphs */
 /* Download and Conductor's Score a matching pair: equal widths, the wider one's */
 .pa-btns{display:grid; grid-template-columns:auto 1fr 1fr; align-items:center}
 .pa-btns .btn.dl{justify-content:center}
@@ -484,7 +485,7 @@ html.marble-on body { background: none !important; }
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download
         </a>
         <a class="btn dl cond" href="/scores/golden-hour-conductors-score.pdf" download="Golden Hour - Conductor's Score.pdf">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor&rsquo;s Score
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor's Score
         </a>
       </div>
     </div>
@@ -626,7 +627,7 @@ html.marble-on body { background: none !important; }
         <button class="btn play play-main" data-src="/scores/rgb.mp3" onclick="playAudio('/scores/rgb.mp3','RGB - Full Demo','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 3l10 5-10 5V3z"/></svg></button>
         <a class="btn dl" href="/scores/rgb.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download</a>
         <a class="btn dl cond" href="/scores/rgb-conductors-score.pdf" download="RGB - Conductor's Score.pdf">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor&rsquo;s Score
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor's Score
         </a>
       </div>
     </div>
@@ -705,7 +706,7 @@ html.marble-on body { background: none !important; }
         <button class="btn play play-main" data-src="/scores/moonliteucalyptus.mp3" onclick="playAudio('/scores/moonliteucalyptus.mp3','Moonlit Eucalyptus - Full Demo','')"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 3l10 5-10 5V3z"/></svg></button>
         <a class="btn dl" href="/scores/moonliteucalyptus.mp3" download><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Download</a>
         <a class="btn dl cond" href="/scores/moonlit-eucalyptus-conductors-score.pdf" download="Moonlit Eucalyptus - Conductor's Score.pdf">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor&rsquo;s Score
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>Conductor's Score
         </a>
       </div>
     </div>
